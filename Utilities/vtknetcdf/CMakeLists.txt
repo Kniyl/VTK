@@ -2,41 +2,8 @@ PROJECT(VTKNETCDF)
 
 INCLUDE_REGULAR_EXPRESSION(".*")
 
-SET(VERSION "4.1.1")
+SET(VERSION "4.1.2")
 SET(PACKAGE "netcdf")
-
-SET(netcdf_SRCS
-  attr.c
-  dim.c
-  error.c
-  libvers.c
-  nc.c
-  posixio.c
-  ncx.c
-  putget.c
-  string.c
-  utf8proc.c
-  v1hpg.c
-  v2i.c
-  var.c
-  )
-
-SET(netcdfcxx_SRCS
-  netcdf.cpp
-  ncvalues.cpp
-  )
-
-IF(APPLE)
-  SET_SOURCE_FILES_PROPERTIES(
-    v2i.c
-    PROPERTIES
-    COMPILE_FLAGS -fno-common)
-ENDIF(APPLE)
-
-INCLUDE_DIRECTORIES(
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_BINARY_DIR}
-  )
 
 # Include all the necessary files for macros
 INCLUDE (CheckIncludeFiles)
@@ -257,8 +224,18 @@ ENDIF(NOT HAVE_SIZEOF_PTRDIFF_T)
 TEST_BIG_ENDIAN(CMAKE_WORDS_BIGENDIAN)
 SET(WORDS_BIGENDIAN ${CMAKE_WORDS_BIGENDIAN})
 
+OPTION(BUILD_NETCDF_CXX "Build C++ API to netcdf3" ON)
+SET(CXX BUILD_NETCDF_CXX)
+
+OPTION(BUILD_NETCDF4 "Build netcdf version 4 API" ON)
+SET(USE_NETCDF4 BUILD_NETCDF4)
+
+SET(BUILD_NETCDF4_CXX BUILD_NETCDF4 AND BUILD_NETCDF_CXX)
+SET(CXX4 BUILD_NETCDF4_CXX)
+  
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/ncconfig.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/ncconfig.h @ONLY IMMEDIATE)
+
 
 #-----------------------------------------------------------------------------
 # Option to allow the user to disable compiler warnings
@@ -286,19 +263,62 @@ IF (NETCDF_DISABLE_COMPILER_WARNINGS)
   ENDIF ()
 ENDIF (NETCDF_DISABLE_COMPILER_WARNINGS)
 
-VTK_ADD_LIBRARY(vtkNetCDF
-  ${netcdf_SRCS})
 
-VTK_ADD_LIBRARY(vtkNetCDF_cxx ${netcdfcxx_SRCS})
-TARGET_LINK_LIBRARIES(vtkNetCDF_cxx vtkNetCDF)
-
+#-----------------------------------------------------------------------------
+#configure the various requested parts of netcdf 
+#-----------------------------------------------------------------------------
 # Take care of symbol export/import on Windows
 ADD_DEFINITIONS("-DNC_DLL_EXPORT")
+
+INCLUDE_DIRECTORIES(
+  
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/libdispatch
+  ${CMAKE_CURRENT_SOURCE_DIR}/libsrc
+  ${CMAKE_CURRENT_SOURCE_DIR}/libsrc4
+  ${CMAKE_CURRENT_BINARY_DIR}
+  ${HDF5_INCLUDE_DIR}
+  )
+
+ADD_SUBDIRECTORY(liblib)
+ADD_SUBDIRECTORY(libdispatch)
+ADD_SUBDIRECTORY(libsrc)
+
+IF (BUILD_NETCDF4)
+  ADD_SUBDIRECTORY(libsrc4)
+ENDIF (BUILD_NETCDF4)
+
+IF (BUILD_NETCDF_CXX)
+  ADD_SUBDIRECTORY(cxx)
+ENDIF (BUILD_NETCDF_CXX)
+
+IF(APPLE)
+  SET_SOURCE_FILES_PROPERTIES(
+    v2i.c
+    PROPERTIES
+    COMPILE_FLAGS -fno-common)
+ENDIF(APPLE)
+
+VTK_ADD_LIBRARY(vtkNetCDF 
+    ${netcdf_src_SOURCES}
+    ${netcdf_src4_SOURCES}
+    ${netcdf_dispatch_SOURCES}
+    ${netcdf_liblib_SOURCES})
+TARGET_LINK_LIBRARIES(vtkNetCDF vtkhdf5 vtkhdf5_hl)
+
+VTK_ADD_LIBRARY(vtkNetCDF_cxx ${netcdf_cxx_SOURCES})
+TARGET_LINK_LIBRARIES(vtkNetCDF_cxx vtkNetCDF)
 
 # Apply user-defined properties to the library target.
 IF(VTK_LIBRARY_PROPERTIES)
   SET_TARGET_PROPERTIES(vtkNetCDF PROPERTIES ${VTK_LIBRARY_PROPERTIES})
 ENDIF(VTK_LIBRARY_PROPERTIES)
+
+#-----------------------------------------------------------------------------
+#package the result
+#-----------------------------------------------------------------------------
+
 
 IF(NOT VTK_INSTALL_NO_LIBRARIES)
   IF(NOT VTK_INSTALL_BIN_DIR_CM24)
