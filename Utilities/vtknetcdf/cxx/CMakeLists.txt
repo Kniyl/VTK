@@ -7,9 +7,8 @@ SET(SOURCES
   ncvalues.cpp
   )
 
-
 foreach(file ${SOURCES})
   set(path_SOURCES ${path_SOURCES} ${PROJECT_SOURCE_DIR}/${file})
 endforeach(file ${SOURCES})
 
-set(netcdf_cxx_SOURCES ${path_SOURCES} PARENT_SCOPE)
+set(netcdf_cxx_SOURCES ${path_SOURCES} CACHE INTERNAL "" FORCE)

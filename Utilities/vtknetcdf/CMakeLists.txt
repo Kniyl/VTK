@@ -228,14 +228,14 @@ OPTION(BUILD_NETCDF_CXX "Build C++ API to netcdf3" ON)
 SET(CXX BUILD_NETCDF_CXX)
 
 OPTION(BUILD_NETCDF4 "Build netcdf version 4 API" ON)
-SET(USE_NETCDF4 BUILD_NETCDF4)
-
-SET(BUILD_NETCDF4_CXX BUILD_NETCDF4 AND BUILD_NETCDF_CXX)
-SET(CXX4 BUILD_NETCDF4_CXX)
+IF (NOT HDF5_BUILD_HL_LIB AND BUILD_NETCDF4)
+  message("BUILD_NETCDF4 not allowed because netcdf4 functionality requires HDF5_BUILD_HL_LIB.")
+  SET(BUILD_NETCDF4 OFF CACHE BOOL "Build netcdf version 4 API" FORCE)
+ENDIF (NOT HDF5_BUILD_HL_LIB AND BUILD_NETCDF4)
+SET(USE_NETCDF4 ${BUILD_NETCDF4} CACHE BOOL "" FORCE)
   
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/ncconfig.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/ncconfig.h @ONLY IMMEDIATE)
-
 
 #-----------------------------------------------------------------------------
 # Option to allow the user to disable compiler warnings
@@ -281,15 +281,22 @@ INCLUDE_DIRECTORIES(
   ${HDF5_INCLUDE_DIR}
   )
 
+set(netcdf_liblib_SOURCES "" CACHE INTERNAL "" FORCE)
 ADD_SUBDIRECTORY(liblib)
+
+set(netcdf_dispatch_SOURCES "" CACHE INTERNAL "" FORCE)
 ADD_SUBDIRECTORY(libdispatch)
+
+set(netcdf_src_SOURCES "" CACHE INTERNAL "" FORCE)
 ADD_SUBDIRECTORY(libsrc)
 
+set(netcdf_src4_SOURCES "" CACHE INTERNAL "" FORCE)
 IF (BUILD_NETCDF4)
   ADD_SUBDIRECTORY(libsrc4)
 ENDIF (BUILD_NETCDF4)
 
 IF (BUILD_NETCDF_CXX)
+  set(netcdf_cxx_SOURCES "" CACHE INTERNAL "" FORCE)
   ADD_SUBDIRECTORY(cxx)
 ENDIF (BUILD_NETCDF_CXX)
 
@@ -305,7 +312,9 @@ VTK_ADD_LIBRARY(vtkNetCDF
     ${netcdf_src4_SOURCES}
     ${netcdf_dispatch_SOURCES}
     ${netcdf_liblib_SOURCES})
-TARGET_LINK_LIBRARIES(vtkNetCDF vtkhdf5 vtkhdf5_hl)
+IF (BUILD_NETCDF4)
+  TARGET_LINK_LIBRARIES(vtkNetCDF vtkhdf5 vtkhdf5_hl)
+ENDIF (BUILD_NETCDF4)
 
 VTK_ADD_LIBRARY(vtkNetCDF_cxx ${netcdf_cxx_SOURCES})
 TARGET_LINK_LIBRARIES(vtkNetCDF_cxx vtkNetCDF)
