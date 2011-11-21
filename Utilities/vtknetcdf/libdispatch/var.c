@@ -669,7 +669,7 @@ NCDEFAULT_put_varm(
         ? imapp[idim]
         : idim == maxidim
         ? 1
-#include "vtk_netcdf_mangle.h"        : mymap[idim + 1] * (ptrdiff_t) myedges[idim + 1];
+        : mymap[idim + 1] * (ptrdiff_t) myedges[idim + 1];
 
         iocount[idim] = 1;
         length[idim] = mymap[idim] * myedges[idim];
