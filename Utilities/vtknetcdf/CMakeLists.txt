@@ -224,7 +224,7 @@ ENDIF(NOT HAVE_SIZEOF_PTRDIFF_T)
 TEST_BIG_ENDIAN(CMAKE_WORDS_BIGENDIAN)
 SET(WORDS_BIGENDIAN ${CMAKE_WORDS_BIGENDIAN})
 
-OPTION(BUILD_NETCDF_CXX "Build C++ API to netcdf3" ON)
+OPTION(BUILD_NETCDF_CXX "Build netcdf C++ API" ON)
 SET(CXX BUILD_NETCDF_CXX)
 
 OPTION(BUILD_NETCDF4 "Build netcdf version 4 API" ON)
@@ -232,7 +232,28 @@ IF (NOT HDF5_BUILD_HL_LIB AND BUILD_NETCDF4)
   message("BUILD_NETCDF4 not allowed because netcdf4 functionality requires HDF5_BUILD_HL_LIB.")
   SET(BUILD_NETCDF4 OFF CACHE BOOL "Build netcdf version 4 API" FORCE)
 ENDIF (NOT HDF5_BUILD_HL_LIB AND BUILD_NETCDF4)
-SET(USE_NETCDF4 ${BUILD_NETCDF4} CACHE BOOL "" FORCE)
+SET(USE_NETCDF4 ${BUILD_NETCDF4} CACHE INTERNAL "" FORCE)
+
+if (BUILD_NETCDF4)
+  set(NETCDF4_DEFAULT_CHUNK_SIZE 4194304 CACHE STRING "Specify default size of chunks in bytes.")
+  mark_as_advanced(NETCDF4_DEFAULT_CHUNK_SIZE)
+  
+  set(NETCDF4_MAX_DEFAULT_CACHE_SIZE 67108864 CACHE STRING "Specify maximum size (in bytes) for the default per-var chunk cache.")
+  mark_as_advanced(NETCDF4_MAX_DEFAULT_CACHE_SIZE)
+
+  set(NETCDF4_DEFAULT_CHUNKS_IN_CACHE 10 CACHE STRING "Specify the number of chunks to store in default per-variable cache.")
+  mark_as_advanced(NETCDF4_DEFAULT_CHUNKS_IN_CACHE)
+
+  set(NETCDF4_CHUNK_CACHE_SIZE 4194304 CACHE STRING "Specify default file cache chunk size for HDF5 files in bytes.")
+  mark_as_advanced(NETCDF4_CHUNK_CACHE_SIZE)
+
+  set(NETCDF4_CHUNK_CACHE_NELEMS 1009 CACHE STRING "Specify default maximum number of elements in the file chunk cache chunk for HDF5 files (should be prime number).")
+  mark_as_advanced(NETCDF4_CHUNK_CACHE_NELEMS)
+
+  set(NETCDF4_CHUNK_CACHE_PREEMPTION 0.75 CACHE STRING "Specify default file chunk cache preemption policy for HDF5 files (a number between 0 and 1, inclusive).")
+  mark_as_advanced(NETCDF4_CHUNK_CACHE_PREEMPTION)
+
+endif (BUILD_NETCDF4)
   
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/ncconfig.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/ncconfig.h @ONLY IMMEDIATE)
