@@ -23,6 +23,8 @@
 #include <vtkIOGeoJSONModule.h> // For export macro
 #include <vtkWriter.h>
 
+class vtkLookupTable;
+
 class VTKIOGEOJSON_EXPORT vtkGeoJSONWriter : public vtkWriter
 {
 public:
@@ -53,6 +55,19 @@ public:
     }
 
   // Description:
+  // Controls how data attributes are written out.
+  // When 0, data attributes are ignored and not written at all.
+  // When 1, values are mapped through a lookup table and colors are written to the output.
+  // When 2, which is the default, the values are written directly.
+  vtkSetMacro(ScalarFormat,int);
+  vtkGetMacro(ScalarFormat,int);
+
+  // Description:
+  // Controls the lookup table to use when ValueMode is set to map colors;
+  void SetLookupTable(vtkLookupTable *lut);
+  vtkGetObjectMacro(LookupTable, vtkLookupTable);
+
+  // Description:
   // When WriteToOutputString is on, this method returns a copy of the
   // output string in a vtkStdString.
   vtkStdString GetOutputStdString();
@@ -75,10 +90,13 @@ protected:
 
   // Helper for Write that writes attributes out
   void WriteScalar(ostream *fp, vtkDataArray *da, vtkIdType ptId);
+  vtkLookupTable *LookupTable;
 
   bool WriteToOutputString;
   char *OutputString;
   int OutputStringLength;
+
+  int ScalarFormat;
 
   // Internal helpers
   ostream *OpenFile();

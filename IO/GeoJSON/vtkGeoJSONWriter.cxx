@@ -17,6 +17,7 @@
 
 #include "vtkCellArray.h"
 #include "vtkInformation.h"
+#include "vtkLookupTable.h"
 #include "vtkObjectFactory.h"
 #include "vtkPointData.h"
 #include "vtkPolyData.h"
@@ -32,6 +33,8 @@ vtkGeoJSONWriter::vtkGeoJSONWriter()
   this->OutputString = NULL;
   this->SetNumberOfOutputPorts(0);
   this->WriteToOutputString = false;
+  this->ScalarFormat = 2;
+  this->LookupTable = NULL;
 }
 
 //------------------------------------------------------------------------------
@@ -39,6 +42,7 @@ vtkGeoJSONWriter::~vtkGeoJSONWriter()
 {
   this->SetFileName(NULL);
   delete[] this->OutputString;
+  this->SetLookupTable(NULL);
 }
 
 //------------------------------------------------------------------------------
@@ -49,6 +53,7 @@ void vtkGeoJSONWriter::PrintSelf(ostream & os, vtkIndent indent)
      << (this->FileName?this->FileName:"NONE") << endl;
   os << indent << "WriteToOutputString: "
      << (this->WriteToOutputString?"True":"False") << endl;
+  os << indent << "ScalarFormat: " << this->ScalarFormat << endl;
 }
 
 //------------------------------------------------------------------------------
@@ -138,10 +143,36 @@ void vtkGeoJSONWriter::ConditionalComma(ostream *fp,
 void vtkGeoJSONWriter::WriteScalar(ostream *fp,
   vtkDataArray *da, vtkIdType ptId)
 {
+  if (this->ScalarFormat == 0)
+  {
+    return;
+  }
   if (da)
   {
     double b = da->GetTuple1(ptId);
-    *fp << "," << b;
+    if (this->ScalarFormat == 1)
+    {
+      vtkLookupTable *lut = this->GetLookupTable();
+      if (!lut)
+      {
+        lut = vtkLookupTable::New();
+        lut->SetNumberOfColors(256);
+        lut->SetHueRange(0.0,0.667);
+        lut->SetRange(da->GetRange());
+        lut->Build();
+        this->SetLookupTable(lut);
+        lut->Delete();
+      }
+      unsigned char *color = lut->MapValue(b);
+      *fp << ","
+          << (double)color[0]/255.0 << ","
+          << (double)color[1]/255.0 << ","
+          << (double)color[2]/255;
+    }
+    else
+    {
+      *fp << "," << b;
+    }
   }
 }
 
@@ -171,15 +202,25 @@ void vtkGeoJSONWriter::WriteData()
     }
   }
   if (da)
-    {
-    double rng[2];
-    da->GetRange(rng);
-    *fp << "\"properties\": {\"ScalarRange\": [" << rng[0] << "," << rng[1] << "] },\n";
+  {
+    switch (this->ScalarFormat) {
+    case 0:
+      *fp << "\"properties\": {\"ScalarFormat\": \"none\"},\n";
+      break;
+    case 1:
+      *fp << "\"properties\": {\"ScalarFormat\": \"rgb\"},\n";
+      break;
+    case 2:
+      double rng[2];
+      da->GetRange(rng);
+      *fp << "\"properties\": {\"ScalarFormat\": \"values\", \"ScalarRange\": [" << rng[0] << "," << rng[1] << "] },\n";
+      break;
     }
+  }
   else
-    {
-    *fp << "\"properties\": null,\n";
-    }
+  {
+    *fp << "\"properties\": {\"ScalarFormat\": \"none\"},\n";
+  }
   *fp << "\"geometry\":\n";
   *fp << "{\n";
   *fp << "\"type\": \"GeometryCollection\",\n";
@@ -331,3 +372,6 @@ vtkStdString vtkGeoJSONWriter::GetOutputStdString()
 {
   return vtkStdString(this->OutputString, this->OutputStringLength);
 }
+
+//------------------------------------------------------------------------------
+vtkCxxSetObjectMacro(vtkGeoJSONWriter, LookupTable, vtkLookupTable)
