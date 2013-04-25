@@ -17,7 +17,6 @@
 
 #include "vtkCellArray.h"
 #include "vtkInformation.h"
-#include "vtkLookupTable.h"
 #include "vtkObjectFactory.h"
 #include "vtkPointData.h"
 #include "vtkPolyData.h"
@@ -136,19 +135,14 @@ void vtkGeoJSONWriter::ConditionalComma(ostream *fp,
 }
 
 //------------------------------------------------------------------------------
-void vtkGeoJSONWriter::WritePointColor(ostream *fp,
+void vtkGeoJSONWriter::WriteScalar(ostream *fp,
   vtkDataArray *da, vtkIdType ptId)
 {
   if (da)
-    {
-    vtkLookupTable *lut = da->GetLookupTable();
+  {
     double b = da->GetTuple1(ptId);
-    unsigned char *color = lut->MapValue(b);
-    *fp << ","
-        << (double)color[0]/255.0 << ","
-        << (double)color[1]/255.0 << ","
-        << (double)color[2]/255;
-    }
+    *fp << "," << b;
+  }
 }
 
 //------------------------------------------------------------------------------
@@ -166,17 +160,32 @@ void vtkGeoJSONWriter::WriteData()
 
   *fp << "{\n";
   *fp << "\"type\": \"Feature\",\n";
-  *fp << "\"properties\": null,\n";
-
+  int association = vtkDataObject::FIELD_ASSOCIATION_POINTS;
+  vtkDataArray *da = this->GetInputArrayToProcess(0, input, association);
+  if (!da)
+  {
+    da = input->GetPointData()->GetScalars();
+    if (!da)
+    {
+      da = input->GetPointData()->GetArray(0);
+    }
+  }
+  if (da)
+    {
+    double rng[2];
+    da->GetRange(rng);
+    *fp << "\"properties\": {\"ScalarRange\": [" << rng[0] << "," << rng[1] << "] },\n";
+    }
+  else
+    {
+    *fp << "\"properties\": null,\n";
+    }
   *fp << "\"geometry\":\n";
   *fp << "{\n";
   *fp << "\"type\": \"GeometryCollection\",\n";
   *fp << "\"geometries\":\n";
   *fp << "[\n";
 
-  //
-  // Write polygonal data specific stuff
-  //
   vtkIdType cellLoc = 0;
   vtkIdType *cellPts = NULL;
   vtkIdType cellSize = 0;
@@ -184,21 +193,6 @@ void vtkGeoJSONWriter::WriteData()
   numlines = input->GetLines()->GetNumberOfCells();
   numpolys = input->GetPolys()->GetNumberOfCells();
 
-  vtkDataArray *da = input->GetPointData()->GetScalars();
-  if (!da)
-    {
-    da = input->GetPointData()->GetArray(0);
-    }
-  if (da)
-    {
-    vtkLookupTable *lut = da->GetLookupTable();
-    if (!lut)
-      {
-      da->CreateDefaultLookupTable();
-      lut = da->GetLookupTable();
-      }
-    lut->SetRange(da->GetRange());
-    }
   for (int i = 0; i < 3; i++)
     {
     vtkCellArray *ca;
@@ -246,7 +240,7 @@ void vtkGeoJSONWriter::WriteData()
               double coords[3];
               input->GetPoint(cellPts[inPt], coords);
               *fp << "[" << coords[0] << "," << coords[1] << "," << coords[2];
-              this->WritePointColor(fp, da, cellPts[inPt]);
+              this->WriteScalar(fp, da, cellPts[inPt]);
               *fp << "]";
               this->ConditionalComma(fp, inPt, cellSize);
               }
@@ -266,7 +260,7 @@ void vtkGeoJSONWriter::WriteData()
               double coords[3];
               input->GetPoint(cellPts[inPt], coords);
               *fp << "[" << coords[0] << "," << coords[1] << "," << coords[2];
-              this->WritePointColor(fp, da, cellPts[inPt]);
+              this->WriteScalar(fp, da, cellPts[inPt]);
               *fp << "]";
               this->ConditionalComma(fp, inPt, cellSize);
               }
@@ -287,7 +281,7 @@ void vtkGeoJSONWriter::WriteData()
               double coords[3];
               input->GetPoint(cellPts[inPt], coords);
               *fp << "[" << coords[0] << "," << coords[1] << "," << coords[2];
-              this->WritePointColor(fp, da, cellPts[inPt]);
+              this->WriteScalar(fp, da, cellPts[inPt]);
               *fp << "]";
               this->ConditionalComma(fp, inPt, cellSize);
               }

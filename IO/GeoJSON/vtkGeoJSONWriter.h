@@ -74,7 +74,7 @@ protected:
   void WriteData();
 
   // Helper for Write that writes attributes out
-  void WritePointColor(ostream *fp, vtkDataArray *da, vtkIdType ptId);
+  void WriteScalar(ostream *fp, vtkDataArray *da, vtkIdType ptId);
 
   bool WriteToOutputString;
   char *OutputString;
