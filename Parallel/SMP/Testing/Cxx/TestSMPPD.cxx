@@ -20,10 +20,10 @@
 
 #include <cstdlib>
 
-#define REPS 1
-#define SMP_R 100
+const int NumRepetitions = 1;
+const int WaveSize = 100;
 
-void test(vtkContourFilter *isosurface)
+void testPD(vtkContourFilter *isosurface)
 {
   vtkTimerLog *timer = vtkTimerLog::New();
   isosurface->SetInputArrayToProcess(0,0,0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "Elevation");
@@ -32,7 +32,7 @@ void test(vtkContourFilter *isosurface)
   cerr << "update " << isosurface->GetClassName() << endl;
   double t, t0,t1;
   t = 0;
-  for (int i = 0; i < REPS; ++i)
+  for (int i = 0; i < NumRepetitions; ++i)
     {
     isosurface->Modified();
     t0 = timer->GetUniversalTime();
@@ -40,7 +40,7 @@ void test(vtkContourFilter *isosurface)
     t1 = timer->GetUniversalTime();
     t += t1-t0;
     }
-  cerr << (t)/REPS << endl;
+  cerr << (t)/NumRepetitions << endl;
   timer->Delete();
 }
 
@@ -57,7 +57,7 @@ int TestSMPPD( int argc, char * argv [] )
   bool sequential = (threads==0);
 
   vtkRTAnalyticSource* wavelet = vtkRTAnalyticSource::New();
-  wavelet->SetWholeExtent(-SMP_R,SMP_R,-SMP_R,SMP_R,-SMP_R,SMP_R);
+  wavelet->SetWholeExtent(-WaveSize,WaveSize,-WaveSize,WaveSize,-WaveSize,WaveSize);
   wavelet->SetCenter(0,0,0);
   wavelet->SetMaximum(255);
   wavelet->SetXFreq(60);
@@ -111,13 +111,13 @@ int TestSMPPD( int argc, char * argv [] )
     }
 
   t0 = timer->GetUniversalTime();
-  for (int i = 0; i < REPS; ++i)
+  for (int i = 0; i < NumRepetitions; ++i)
     {
     transform->Modified();
     transform->Update();
     }
   t1 = timer->GetUniversalTime();
-  cerr << (t1-t0)/REPS << endl;
+  cerr << (t1-t0)/NumRepetitions << endl;
 
   /* === Testing contour filter === */
 
@@ -131,42 +131,34 @@ int TestSMPPD( int argc, char * argv [] )
   vtkSMPMinMaxTree* tree = vtkSMPMinMaxTree::New();
   isosurface2->SetScalarTree(tree);
   tree->Delete();
-  isosurface2->SetInputConnection( aa->GetOutputPort() );
+  isosurface2->SetInputConnection( transform->GetOutputPort() );
 
-  test(isosurface1);
-  test(isosurface2);
+  testPD(isosurface1);
+  testPD(isosurface2);
 
-/*
+  /* === Watching outputs === */
+
+  isosurface1->GetOutput()->GetBounds(b);
+
   vtkDataSetMapper* map1 = vtkDataSetMapper::New();
-  map1->SetInputConnection( cf->GetOutputPort() );
-  cf->Delete();
+  map1->SetInputConnection( isosurface1->GetOutputPort() );
   vtkActor* actor1 = vtkActor::New();
   actor1->SetMapper( map1 );
   map1->Delete();
 
   vtkDataSetMapper* map2 = vtkDataSetMapper::New();
-  map2->SetInputConnection( transform->GetOutputPort() );
-  transform->Delete();
+  map2->SetInputConnection( isosurface2->GetOutputPort() );
   vtkActor* actor2 = vtkActor::New();
   actor2->SetMapper( map2 );
   map2->Delete();
   actor2->AddPosition( (b[1]-b[0])*1.1, 0., 0. );
 
-  vtkDataSetMapper* map3 = vtkDataSetMapper::New();
-  map3->SetInputConnection( isosurface->GetOutputPort() );
-  vtkActor* actor3 = vtkActor::New();
-  actor3->SetMapper( map3 );
-  map3->Delete();
-  actor3->AddPosition( (b[1]-b[0])*2.1, 0., 0. );
-
   vtkRenderer* viewport = vtkRenderer::New();
   viewport->SetBackground( .5, .5, .5 );
   viewport->AddActor( actor1 );
   viewport->AddActor( actor2 );
-  viewport->AddActor( actor3 );
   actor1->Delete();
   actor2->Delete();
-  actor3->Delete();
 
   vtkRenderWindow* window = vtkRenderWindow::New();
   window->AddRenderer( viewport );
@@ -181,7 +173,7 @@ int TestSMPPD( int argc, char * argv [] )
   iren->Start();
 
   iren->Delete();
-*/
+
   isosurface1->Delete();
   isosurface2->Delete();
 
