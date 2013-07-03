@@ -23,10 +23,10 @@
 
 #define REPS 5
 
-void setupTest(vtkDataSetReader* reader, vtkContourFilter* isosurface, bool sequential = true)
-{
+void testMesh(vtkDataSetReader* reader, vtkContourFilter* isosurface, bool sequential = true)
+  {
   vtkTimerLog *timer = vtkTimerLog::New();
-  double t, t0,t1;
+  double t,t0,t1;
 
   cerr << "/************* ";
   if (sequential)
@@ -90,19 +90,25 @@ void setupTest(vtkDataSetReader* reader, vtkContourFilter* isosurface, bool sequ
     }
   cerr << "Isosurface: " << (t)/REPS << endl;
   timer->Delete();
-}
+  }
 
-int TestSMPPD2( int argc, char * argv [] )
+int TestSMPMesh( int argc, char * argv [] )
 {
   double t0, t1;
   vtkTimerLog* timer;
   if (argc < 1)
     {
     cerr << "You should specify a filename" << endl;
+    return 1;
     }
   
   vtkDataSetReader* aa = vtkDataSetReader::New();
   aa->SetFileName(argv[1]);
+  if (!aa->OpenVTKFile())
+    {
+    cerr << "The file " << argv[1] << " can't be openned." << endl;
+    return 1;
+    }
 
   cerr << "Reading " << aa->GetFileName() << endl;
   timer = vtkTimerLog::New();
@@ -125,8 +131,8 @@ int TestSMPPD2( int argc, char * argv [] )
   isosurface2->SetScalarTree(tree);
   tree->Delete();
 
-  setupTest(aa,isosurface1);
-  setupTest(aa,isosurface2,false);
+  testMesh(aa,isosurface1);
+  testMesh(aa,isosurface2,false);
   aa->Delete();
 
   /* === Watching outputs === */

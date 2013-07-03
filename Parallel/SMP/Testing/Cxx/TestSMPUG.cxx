@@ -18,22 +18,82 @@
 
 #include <cstdlib>
 
+const int WaveSize = 100;
+const int NumRepetitions = 5;
+
+void testUG(vtkAlgorithm* input, vtkContourFilter* isosurface, bool sequential = true)
+  {
+  vtkTimerLog *timer = vtkTimerLog::New();
+  double t,t0,t1;
+
+  cerr << "/************* ";
+  if (sequential)
+   cerr << "Sequential";
+  else
+   cerr << "SMP";
+  cerr << " *************/" << endl;
+
+  vtkTransformFilter* transform = vtkTransformFilter::New();
+  transform->SetInputConnection( input->GetOutputPort() );
+  if (sequential)
+    {
+    vtkTransform* tr = vtkTransform::New();
+    tr->Identity();
+    transform->SetTransform(tr);
+    tr->Delete();
+    }
+  else
+    {
+    vtkSMPTransform* tr = vtkSMPTransform::New();
+    tr->Identity();
+    transform->SetTransform(tr);
+    tr->Delete();
+    }
+
+  isosurface->SetInputConnection( transform->GetOutputPort() );
+  transform->Delete();
+  isosurface->GenerateValues( 11, 30.0, 300.0 );
+  isosurface->UseScalarTreeOn();
+  cerr << "First " << transform->GetClassName() << " execution" << endl;
+  t0 = timer->GetUniversalTime();
+  transform->Update();
+  t1 = timer->GetUniversalTime();
+  cerr << t1-t0 << endl;
+  cerr << "Average time for " << NumRepetitions << " other executions" << endl;
+  t = 0.0;
+  for (int i = 0; i < NumRepetitions; ++i)
+    {
+    transform->Modified();
+    t0 = timer->GetUniversalTime();
+    transform->Update();
+    t1 = timer->GetUniversalTime();
+    t += t1-t0;
+    }
+  cerr << "Transform: " << (t)/NumRepetitions << endl;
+
+  cerr << "First " << isosurface->GetClassName() << " execution" << endl;
+  t0 = timer->GetUniversalTime();
+  isosurface->Update();
+  t1 = timer->GetUniversalTime();
+  cerr << t1-t0 << endl;
+  cerr << "Average time for " << NumRepetitions << " other executions" << endl;
+  t = 0.0;
+  for (int i = 0; i < NumRepetitions; ++i)
+    {
+    isosurface->Modified();
+    t0 = timer->GetUniversalTime();
+    isosurface->Update();
+    t1 = timer->GetUniversalTime();
+    t += t1-t0;
+    }
+  cerr << "Isosurface: " << (t)/NumRepetitions << endl;
+  timer->Delete();
+  }
 
 int TestSMPUG( int argc, char * argv [] )
-{
-  vtkTimerLog *timer = vtkTimerLog::New();
-  double t0, t1;
-
-  int threads = 0;
-  if (argc > 1)
-    {
-    threads = atoi(argv[1]);
-    }
-  bool sequential = (threads==0);
-
+  {
   vtkRTAnalyticSource* wavelet = vtkRTAnalyticSource::New();
-#define SMP_R 15
-  wavelet->SetWholeExtent(-SMP_R,SMP_R,-SMP_R,SMP_R,-SMP_R,SMP_R);
+  wavelet->SetWholeExtent(-WaveSize,WaveSize,-WaveSize,WaveSize,-WaveSize,WaveSize);
   wavelet->SetCenter(0,0,0);
   wavelet->SetMaximum(255);
   wavelet->SetXFreq(60);
@@ -55,112 +115,46 @@ int TestSMPUG( int argc, char * argv [] )
   aa->SetInputConnection(threshold->GetOutputPort());
   aa->Assign("RTData", vtkDataSetAttributes::SCALARS, vtkAssignAttribute::POINT_DATA);
 
-  vtkTransformFilter* transform = vtkTransformFilter::New();
-  transform->SetInputConnection( aa->GetOutputPort() );
-  aa->Delete();
-
-  if ( sequential )
-    {
-    vtkTransform* t = vtkTransform::New();
-    t->Scale( 1, 2, 3 );
-    transform->SetTransform( t );
-    cerr << "update " << t->GetClassName() << endl;
-    t->Delete();
-    }
-  else
-    {
-    vtkSMPTransform* t = vtkSMPTransform::New();
-    t->Scale( 1, 2, 3 );
-    transform->SetTransform( t );
-    cerr << "update " << t->GetClassName() << endl;
-    t->Delete();
-    }
-
-#define REPS 25
-  t0 = timer->GetUniversalTime();
-  for (int i = 0; i < REPS; ++i)
-    {
-    transform->Modified();
-    transform->Update();
-    }
-  t1 = timer->GetUniversalTime();
-  cerr << (t1-t0)/REPS << endl;
-
   /* === Testing contour filter === */
 
-  vtkContourFilter* isosurface;
-  if ( sequential )
-    {
-    isosurface = vtkContourFilter::New();
-    }
-  else
-    {
-    isosurface = vtkSMPContourFilter::New();
+  vtkContourFilter* isosurface1 = vtkContourFilter::New();
+  
+  vtkSMPContourFilter* isosurface2 = vtkSMPContourFilter::New();
+  vtkSMPMergePoints* locator = vtkSMPMergePoints::New();
+  isosurface2->SetLocator( locator );
+  locator->Delete();
+  vtkSMPMinMaxTree* tree = vtkSMPMinMaxTree::New();
+  isosurface2->SetScalarTree(tree);
+  tree->Delete();
 
-    vtkSMPMergePoints* locator = vtkSMPMergePoints::New();
-    isosurface->SetLocator( locator );
-    locator->Delete();
-    vtkSMPMinMaxTree* tree = vtkSMPMinMaxTree::New();
-    isosurface->SetScalarTree(tree);
-    tree->Delete();
-    }
+  aa->Update(); // Pull pipeline up-to-date to acurately time further filters
+  testUG(aa, isosurface1);
+  testUG(aa, isosurface2, false);
 
-  isosurface->SetInputConnection( transform->GetOutputPort() );
-  isosurface->SetInputArrayToProcess(0,0,0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "RTData");
-  isosurface->GenerateValues( 11, 30.0, 300.0 );
-  isosurface->UseScalarTreeOn();
-
-
-  cerr << "update " << isosurface->GetClassName() << endl;
-  double t = 0;
-
-  for (int i = 0; i < REPS; ++i)
-    {
-    isosurface->Modified();
-    t0 = timer->GetUniversalTime();
-    isosurface->Update();
-    t1 = timer->GetUniversalTime();
-    t += t1-t0;
-    }
-  cerr << (t)/REPS << endl;
-
+  /* === Watching results === */
+  
   double b[6];
-  threshold->GetOutput()->GetBounds(b);
+  isosurface1->GetOutput()->GetBounds(b);
 
   vtkDataSetMapper* map1 = vtkDataSetMapper::New();
-  map1->SetInputConnection( threshold->GetOutputPort() );
-  threshold->Delete();
-
+  map1->SetInputConnection( isosurface1->GetOutputPort() );
   vtkActor* actor1 = vtkActor::New();
   actor1->SetMapper( map1 );
   map1->Delete();
 
   vtkDataSetMapper* map2 = vtkDataSetMapper::New();
-  map2->SetInputConnection( transform->GetOutputPort() );
-  transform->Delete();
-
+  map2->SetInputConnection( isosurface2->GetOutputPort() );
   vtkActor* actor2 = vtkActor::New();
   actor2->SetMapper( map2 );
   map2->Delete();
   actor2->AddPosition( (b[1]-b[0])*1.1, 0., 0. );
 
-  vtkDataSetMapper* map3 = vtkDataSetMapper::New();
-  map3->SetInputConnection( isosurface->GetOutputPort() );
-  isosurface->Delete();
-
-  vtkActor* actor3 = vtkActor::New();
-  actor3->SetMapper( map3 );
-  map3->Delete();
-  actor3->AddPosition( (b[1]-b[0])*2.1, 0., 0. );
-
   vtkRenderer* viewport = vtkRenderer::New();
   viewport->SetBackground( .5, .5, .5 );
   viewport->AddActor( actor1 );
   viewport->AddActor( actor2 );
-  viewport->AddActor( actor3 );
   actor1->Delete();
   actor2->Delete();
-  actor3->Delete();
 
   vtkRenderWindow* window = vtkRenderWindow::New();
   window->AddRenderer( viewport );
@@ -176,6 +170,8 @@ int TestSMPUG( int argc, char * argv [] )
 
   iren->Delete();
 
-  timer->Delete();
+  isosurface1->Delete();
+  isosurface2->Delete();
+
   return 0;
-}
+  }
