@@ -19,11 +19,12 @@ struct VTKPARALLELSMP_EXPORT vtkLockPointMerger : public vtkFunctor
   static vtkLockPointMerger* New();
   void PrintSelf(ostream &os, vtkIndent indent);
 
-  void operator()( vtkIdType id ) const;
+  void operator()( vtkIdType id, vtkLocalData* data ) const;
 
 protected:
   vtkLockPointMerger() {}
   ~vtkLockPointMerger() {}
+
 private:
   vtkLockPointMerger(const vtkLockPointMerger&);
   void operator =(const vtkLockPointMerger&);

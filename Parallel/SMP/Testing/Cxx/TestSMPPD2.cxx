@@ -61,12 +61,6 @@ void setupTest(vtkDataSetReader* reader, vtkContourFilter* isosurface, bool sequ
   transform->Update();
   t1 = timer->GetUniversalTime();
   cerr << t1-t0 << endl;
-  cerr << "First " << isosurface->GetClassName() << " execution" << endl;
-  t0 = timer->GetUniversalTime();
-  isosurface->Update();
-  t1 = timer->GetUniversalTime();
-  cerr << t1-t0 << endl;
-
   cerr << "Average time for " << REPS << " other executions" << endl;
   t = 0.0;
   for (int i = 0; i < REPS; ++i)
@@ -78,6 +72,13 @@ void setupTest(vtkDataSetReader* reader, vtkContourFilter* isosurface, bool sequ
     t += t1-t0;
     }
   cerr << "Transform: " << (t)/REPS << endl;
+
+  cerr << "First " << isosurface->GetClassName() << " execution" << endl;
+  t0 = timer->GetUniversalTime();
+  isosurface->Update();
+  t1 = timer->GetUniversalTime();
+  cerr << t1-t0 << endl;
+  cerr << "Average time for " << REPS << " other executions" << endl;
   t = 0.0;
   for (int i = 0; i < REPS; ++i)
     {

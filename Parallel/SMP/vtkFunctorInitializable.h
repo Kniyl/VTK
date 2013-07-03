@@ -11,14 +11,14 @@ public:
   vtkTypeMacro(vtkFunctorInitializable,vtkFunctor);
   void PrintSelf(ostream& os, vtkIndent indent);
 
-  virtual void Init ( ) const = 0;
-  bool ShouldInitialize( ) const;
+  virtual void Init ( int ) const = 0;
+  bool ShouldInitialize ( int ) const;
 
 protected:
   vtkFunctorInitializable();
   ~vtkFunctorInitializable();
 
-  void Initialized( ) const;
+  void Initialized ( int ) const;
   mutable vtkstd::vector<vtkIdType> IsInitialized;
 
 private:

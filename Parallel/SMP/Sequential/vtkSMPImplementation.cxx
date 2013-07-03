@@ -5,13 +5,13 @@
 #include "vtkTask.h"
 #include "vtkMergeDataSets.h"
 
-void sequential_traverse( vtkIdType index, int lvl, vtkIdType BranchingFactor, const vtkParallelTree* Tree, vtkFunctor* func )
+void sequential_traverse( vtkIdType index, int lvl, vtkIdType BranchingFactor, const vtkParallelTree* Tree, vtkFunctor* func, vtkLocalData* data )
   {
-  if ( Tree->TraverseNode( index, lvl, func ) )
+  if ( Tree->TraverseNode( index, lvl, func, data ) )
     {
     for ( vtkIdType i = index * BranchingFactor + 1, j = 0; j < BranchingFactor; ++i, ++j )
       {
-      sequential_traverse( i, lvl + 1, BranchingFactor, Tree, func );
+      sequential_traverse( i, lvl + 1, BranchingFactor, Tree, func, data );
       }
     }
   }
@@ -28,16 +28,20 @@ int vtkSMPInternalGetNumberOfThreads()
 
 void vtkParallelOperators::ForEach( vtkIdType first, vtkIdType last, const vtkFunctor* op, int grain )
 {
+  vtkLocalData* data = op->getLocal(0);
   for ( ; first < last; ++first )
-    (*op)( first );
+    (*op)( first, data );
+  data->Delete();
 }
 
 void vtkParallelOperators::ForEach( vtkIdType first, vtkIdType last, const vtkFunctorInitializable* f, int grain )
 {
-  if ( f->ShouldInitialize() )
-    f->Init( );
+  if ( f->ShouldInitialize(0) )
+    f->Init(0);
+  vtkLocalData* data = f->getLocal(0);
   for ( ; first < last; ++first )
-    (*f)( first );
+    (*f)( first, data );
+  data->Delete();
 }
 
 void vtkParallelOperators::Traverse( const vtkParallelTree* Tree, vtkFunctor* func )
@@ -45,7 +49,9 @@ void vtkParallelOperators::Traverse( const vtkParallelTree* Tree, vtkFunctor* fu
   int lvl;
   vtkIdType bf;
   Tree->GetTreeSize(lvl,bf);
-  sequential_traverse( 0, 0, bf, Tree, func );
+  vtkLocalData* data = func->getLocal(0);
+  sequential_traverse( 0, 0, bf, Tree, func, data );
+  data->Delete();
 }
 
 void vtkMergeDataSets::Parallel(
@@ -89,3 +95,8 @@ void vtkMergeDataSets::Parallel(
                        offset7[0],
                        offset8[0] );
 }
+
+void vtkFunctor::ComputeMasterTID()
+  {
+  this->MasterThreadId = 0;
+  }

@@ -93,7 +93,7 @@ public:
     this->locator = locator;
     }
 
-  virtual void operator ()( vtkIdType i ) const
+  virtual void operator()( vtkIdType i, vtkLocalData* data) const
     {
     double pt[3];
     vtkIdType id = locator->GetSortedPoints( i, pt );

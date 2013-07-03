@@ -41,6 +41,54 @@ void vtkSMPContourFilter::PrintSelf(ostream& os, vtkIndent indent)
   this->Superclass::PrintSelf(os,indent);
   }
 
+class vtkSMPContourFilterLocalData : public vtkLocalData
+  {
+    vtkSMPContourFilterLocalData(const vtkSMPContourFilterLocalData&);
+    void operator=(const vtkSMPContourFilterLocalData&);
+  protected:
+    vtkSMPContourFilterLocalData() :
+        Locator(0), newVerts(0), newLines(0),
+        newPolys(0), outPd(0), outCd(0),
+        Cells(0), CellsScalars(0)
+      {
+      }
+    ~vtkSMPContourFilterLocalData(){}
+  public:
+    vtkTypeMacro(vtkSMPContourFilterLocalData,vtkLocalData);
+    static vtkSMPContourFilterLocalData* New();
+    void PrintSelf(ostream& os, vtkIndent indent)
+      {
+      this->Superclass::PrintSelf(os,indent);
+      os << indent << "Locator: (" << Locator << ")" << endl;
+      if (Locator) Locator->PrintSelf(os,indent.GetNextIndent());
+      os << indent << "newVerts: (" << newVerts << ")" << endl;
+      if (newVerts) newVerts->PrintSelf(os,indent.GetNextIndent());
+      os << indent << "newLines: (" << newLines << ")" << endl;
+      if (newLines) newLines->PrintSelf(os,indent.GetNextIndent());
+      os << indent << "newPolys: (" << newPolys << ")" << endl;
+      if (newPolys) newPolys->PrintSelf(os,indent.GetNextIndent());
+      os << indent << "outPd: (" << outPd << ")" << endl;
+      if (outPd) outPd->PrintSelf(os,indent.GetNextIndent());
+      os << indent << "outCd: (" << outCd << ")" << endl;
+      if (outCd) outCd->PrintSelf(os,indent.GetNextIndent());
+      os << indent << "Cells: (" << Cells << ")" << endl;
+      if (Cells) Cells->PrintSelf(os,indent.GetNextIndent());
+      os << indent << "CellsScalars: (" << CellsScalars << ")" << endl;
+      if (CellsScalars) CellsScalars->PrintSelf(os,indent.GetNextIndent());
+      }
+
+    vtkIncrementalPointLocator* Locator;
+    vtkCellArray* newVerts;
+    vtkCellArray* newLines;
+    vtkCellArray* newPolys;
+    vtkPointData* outPd;
+    vtkCellData* outCd;
+    vtkGenericCell* Cells;
+    vtkDataArray* CellsScalars;
+  };
+
+vtkStandardNewMacro(vtkSMPContourFilterLocalData);
+
 /* ================================================================================
   Generic contouring: Functors for parallel execution without ScalarTree
  ================================================================================ */
@@ -139,30 +187,48 @@ public:
     outputCd = _outputCd;
     outputPd = _outputPd;
 
+    int tid = this->MasterThreadId;
     if ( !computeScalars )
       {
       _outputPd->CopyScalarsOff();
       }
     _outputPd->InterpolateAllocate( inPd, estimatedSize, estimatedSize );
     _outputCd->CopyAllocate( inCd, estimatedSize, estimatedSize );
-    Locator->SetLocal( _locator );
-    newPts->SetLocal( _inPts );
-    newVerts->SetLocal( _outputVerts );
-    newLines->SetLocal( _outputLines );
-    newPolys->SetLocal( _outputPolys );
-    outPd->SetLocal( _outputPd );
-    outCd->SetLocal( _outputCd );
-    Cells->NewLocal( );
-    vtkDataArray* cScalars = CellsScalars->NewLocal( inScalars );
+    Locator->SetLocal( _locator, tid );
+    newPts->SetLocal( _inPts, tid );
+    newVerts->SetLocal( _outputVerts, tid );
+    newLines->SetLocal( _outputLines, tid );
+    newPolys->SetLocal( _outputPolys, tid );
+    outPd->SetLocal( _outputPd, tid );
+    outCd->SetLocal( _outputCd, tid );
+    Cells->NewLocal(tid);
+    vtkDataArray* cScalars = CellsScalars->NewLocal( inScalars, tid );
     cScalars->SetNumberOfComponents( inScalars->GetNumberOfComponents() );
     cScalars->Allocate( cScalars->GetNumberOfComponents() * VTK_CELL_SIZE );
 
-    Initialized();
+    Initialized(tid);
     }
 
-  void operator ()( vtkIdType cellId ) const
+  vtkLocalData* getLocal(int tid) const
     {
-    vtkGenericCell *cell = this->Cells->GetLocal( );
+    vtkSMPContourFilterLocalData* data =
+      vtkSMPContourFilterLocalData::New();
+    data->Locator = this->Locator->GetLocal(tid);
+    data->newVerts = this->newVerts->GetLocal(tid);
+    data->newLines = this->newLines->GetLocal(tid);
+    data->newPolys = this->newPolys->GetLocal(tid);
+    data->outPd = this->outPd->GetLocal(tid);
+    data->outCd = this->outCd->GetLocal(tid);
+    data->Cells = this->Cells->GetLocal(tid);
+    data->CellsScalars = this->CellsScalars->GetLocal(tid);
+    return data;
+    }
+
+  void operator()( vtkIdType cellId, vtkLocalData* d ) const
+    {
+    vtkSMPContourFilterLocalData* data = 
+      static_cast<vtkSMPContourFilterLocalData*>(d);
+    vtkGenericCell *cell = data->Cells;
     int cellType = input->GetCellType(cellId);
     if (cellType >= VTK_NUMBER_OF_CELL_TYPES)
       { // Protect against new cell types added.
@@ -175,7 +241,7 @@ public:
       }
     input->GetCell(cellId,cell);
     vtkIdList* cellPts = cell->GetPointIds();
-    vtkDataArray* cellScalars = this->CellsScalars->GetLocal( );
+    vtkDataArray* cellScalars = data->CellsScalars;
     if ( cellScalars->GetSize() / cellScalars->GetNumberOfComponents() < cellPts->GetNumberOfIds() )
       {
       cellScalars->Allocate(cellScalars->GetNumberOfComponents()*cellPts->GetNumberOfIds());
@@ -185,43 +251,43 @@ public:
     for (int i = 0; i < numContours; i++)
       {
       double v = values[i];
-      cell->Contour( v, cellScalars, this->Locator->GetLocal( ),
-                     newVerts->GetLocal( ), newLines->GetLocal( ), newPolys->GetLocal( ),
-                     inPd, outPd->GetLocal( ), inCd, cellId, outCd->GetLocal( ) );
+      cell->Contour( v, cellScalars, data->Locator,
+                     data->newVerts, data->newLines, data->newPolys,
+                     inPd, data->outPd, inCd, cellId, data->outCd );
       }
     }
 
-  void Init( ) const
+  void Init(int tid) const
     {
-    vtkPoints* pts = this->newPts->NewLocal( );
+    vtkPoints* pts = this->newPts->NewLocal(tid);
     pts->Allocate( this->estimatedSize, this->estimatedSize );
-    vtkIncrementalPointLocator* l = this->Locator->NewLocal( this->refLocator );
+    vtkIncrementalPointLocator* l = this->Locator->NewLocal( this->refLocator, tid );
     l->InitPointInsertion( pts, this->input->GetBounds(), this->estimatedSize );
 
-    vtkCellArray* c = this->newVerts->NewLocal( );
+    vtkCellArray* c = this->newVerts->NewLocal(tid);
     c->Allocate( this->estimatedSize, this->estimatedSize );
-    c = this->newLines->NewLocal( );
+    c = this->newLines->NewLocal(tid);
     c->Allocate( this->estimatedSize, this->estimatedSize );
-    c = this->newPolys->NewLocal( );
+    c = this->newPolys->NewLocal(tid);
     c->Allocate( this->estimatedSize, this->estimatedSize );
 
-    vtkPointData* pd = this->outPd->NewLocal( );
+    vtkPointData* pd = this->outPd->NewLocal(tid);
     if ( !this->computeScalars )
       {
       pd->CopyScalarsOff();
       }
     pd->InterpolateAllocate( this->inPd, this->estimatedSize, this->estimatedSize );
 
-    vtkCellData* cd = this->outCd->NewLocal( );
+    vtkCellData* cd = this->outCd->NewLocal(tid);
     cd->CopyAllocate( this->inCd, this->estimatedSize, this->estimatedSize );
 
-    this->Cells->NewLocal( );
+    this->Cells->NewLocal(tid);
 
-    vtkDataArray* cScalars = this->CellsScalars->NewLocal( this->inScalars );
+    vtkDataArray* cScalars = this->CellsScalars->NewLocal( this->inScalars, tid );
     cScalars->SetNumberOfComponents( this->inScalars->GetNumberOfComponents() );
     cScalars->Allocate( cScalars->GetNumberOfComponents() * VTK_CELL_SIZE );
 
-    Initialized();
+    Initialized(tid);
     }
 };
 
@@ -249,20 +315,22 @@ public:
 
   double ScalarValue;
 
-  void operator ()( vtkIdType id ) const
+  void operator()( vtkIdType id, vtkLocalData* d ) const
     {
-    vtkGenericCell* cell = this->Cells->GetLocal( );
-    vtkDataArray* scalars = this->CellsScalars->GetLocal( );
+    vtkSMPContourFilterLocalData* data =
+      static_cast<vtkSMPContourFilterLocalData*>(d);
+    vtkGenericCell* cell = data->Cells;
+    vtkDataArray* scalars = data->CellsScalars;
 
     this->input->GetCell( id, cell );
     vtkIdList* cellPts = cell->GetPointIds();
     scalars->SetNumberOfTuples( cellPts->GetNumberOfIds() );
     this->inScalars->GetTuples( cellPts, scalars );
 
-    cell->Contour( ScalarValue, scalars, this->Locator->GetLocal( ),
-                   this->newVerts->GetLocal( ), this->newLines->GetLocal( ), this->newPolys->GetLocal( ),
-                   this->inPd, this->outPd->GetLocal( ),
-                   this->inCd, id, this->outCd->GetLocal( ));
+    cell->Contour( ScalarValue, scalars, data->Locator,
+                   data->newVerts, data->newLines, data->newPolys,
+                   this->inPd, data->outPd,
+                   this->inCd, id, data->outCd);
     }
 };
 

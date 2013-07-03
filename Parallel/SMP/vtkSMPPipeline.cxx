@@ -17,6 +17,37 @@
 
 vtkInformationKeyMacro(vtkSMPPipeline, DATA_OBJECT_CONCRETE_TYPE, String);
 
+class vtkSMPPipelineLocalData : public vtkLocalData
+  {
+    vtkSMPPipelineLocalData(const vtkSMPPipelineLocalData&);
+    void operator=(const vtkSMPPipelineLocalData&);
+  protected:
+    vtkSMPPipelineLocalData() : inLocalInfo(0), outLocalInfo(0), requests(0) {}
+    ~vtkSMPPipelineLocalData()
+      {
+      if (inLocalInfo) delete [] inLocalInfo;
+      }
+  public:
+    vtkTypeMacro(vtkSMPPipelineLocalData,vtkLocalData);
+    static vtkSMPPipelineLocalData* New();
+    void PrintSelf(ostream& os, vtkIndent indent)
+      {
+      this->Superclass::PrintSelf(os,indent);
+      os << indent << "InLocalInfo: (" << inLocalInfo << ")" << endl;
+      if (inLocalInfo) inLocalInfo[0]->PrintSelf(os,indent.GetNextIndent());
+      os << indent << "OutLocalInfo: (" << outLocalInfo << ")" << endl;
+      if (outLocalInfo) outLocalInfo->PrintSelf(os,indent.GetNextIndent());
+      os << indent << "Requests: (" << requests << ")" << endl;
+      if (requests) requests->PrintSelf(os,indent.GetNextIndent());
+      }
+
+    vtkInformationVector** inLocalInfo;
+    vtkInformationVector* outLocalInfo;
+    vtkInformation* requests;
+  };
+
+vtkStandardNewMacro(vtkSMPPipelineLocalData);
+
 class ParallelFilterExecutor : public vtkFunctorInitializable
 {
     ParallelFilterExecutor(const ParallelFilterExecutor&);
@@ -60,47 +91,56 @@ class ParallelFilterExecutor : public vtkFunctorInitializable
       this->Superclass::PrintSelf(os,indent);
       }
 
-    void Init() const
+    void Init(int tid) const
       {
       vtkIdType numPorts = this->Executive->GetNumberOfInputPorts();
       for (vtkIdType i = 0; i < numPorts; ++i)
         {
-        vtkInformationVector* info = this->inLocalInfo[i]->NewLocal();
+        vtkInformationVector* info = this->inLocalInfo[i]->NewLocal(tid);
         info->Copy(inInfoVec[i], 1);
         }
-      this->outLocalInfo->NewLocal()->Copy(outInfoVec, 1);
-      this->requests->NewLocal()->Copy(request, 1);
+      this->outLocalInfo->NewLocal(tid)->Copy(outInfoVec, 1);
+      this->requests->NewLocal(tid)->Copy(request, 1);
 
-      this->Initialized();
+      this->Initialized(tid);
       }
 
-    void operator ()(vtkIdType id) const
+    vtkLocalData* getLocal(int tid) const
       {
+      vtkSMPPipelineLocalData* data = vtkSMPPipelineLocalData::New();
+      vtkIdType numPorts = this->Executive->GetNumberOfInputPorts();
+      data->inLocalInfo = new vtkInformationVector*[numPorts];
+      for (vtkIdType i = 0; i < numPorts; ++i)
+        {
+        data->inLocalInfo[i] = this->inLocalInfo[i]->GetLocal(tid);
+        }
+      data->outLocalInfo = this->outLocalInfo->GetLocal(tid);
+      data->requests = this->requests->GetLocal(tid);
+      return data;
+      }
+
+    void operator()(vtkIdType id, vtkLocalData* d) const
+      {
+      vtkSMPPipelineLocalData* data =
+        static_cast<vtkSMPPipelineLocalData*>(d);
       vtkDataObject* dobj = this->inObjs[id];
       if (dobj)
         {
-        vtkInformation* r = this->requests->GetLocal();
-        vtkIdType numPorts = this->Executive->GetNumberOfInputPorts();
-        vtkInformationVector** inInfoVector = new vtkInformationVector*[numPorts];
-        for (vtkIdType i=0; i<numPorts; ++i)
-          {
-          inInfoVector[i] = this->inLocalInfo[i]->GetLocal();
-          }
-        vtkInformation* inInfo = this->inLocalInfo[this->compositePort]->GetLocal()->GetInformationObject(0);
-        vtkInformation* outInfo = this->outLocalInfo->GetLocal()->GetInformationObject(0);
+        vtkInformation* r = data->requests;
+        vtkInformation* inInfo = data->inLocalInfo[this->compositePort]->GetInformationObject(0);
+        vtkInformation* outInfo = data->outLocalInfo->GetInformationObject(0);
 
         // Note that since VisitOnlyLeaves is ON on the iterator,
         // this method is called only for leaves, hence, we are assured that
         // neither dobj nor outObj are vtkCompositeDataSet subclasses.
         this->outObjs[id] =
             this->Executive->ExecuteSimpleAlgorithmForBlock(
-                                                 inInfoVector,
-                                                 outLocalInfo->GetLocal(),
+                                                 data->inLocalInfo,
+                                                 data->outLocalInfo,
                                                  inInfo,
                                                  outInfo,
                                                  r,
                                                  dobj);
-        delete [] inInfoVector;
         }
       else
         {
@@ -140,7 +180,7 @@ class ParallelFilterExecutor : public vtkFunctorInitializable
         }
       this->outObjs.resize(this->inObjs.size(), NULL);
 
-      this->Init();
+      this->Init(this->MasterThreadId);
       }
 
     size_t GetInputSize()

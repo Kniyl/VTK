@@ -5,7 +5,8 @@ extern int vtkSMPInternalGetTid();
 
 //======================================================================================
 vtkFunctorInitializable::vtkFunctorInitializable() :
-    vtkFunctor(), IsInitialized(vtkSMPInternalGetNumberOfThreads(), 0)
+    vtkFunctor(),
+    IsInitialized(vtkSMPInternalGetNumberOfThreads(), 0)
   {
   }
 
@@ -16,15 +17,15 @@ vtkFunctorInitializable::~vtkFunctorInitializable()
   }
 
 //--------------------------------------------------------------------------------
-bool vtkFunctorInitializable::ShouldInitialize( ) const
+bool vtkFunctorInitializable::ShouldInitialize(int tid) const
   {
-  return !IsInitialized[vtkSMPInternalGetTid()];
+  return !IsInitialized[tid];
   }
 
 //--------------------------------------------------------------------------------
-void vtkFunctorInitializable::Initialized( ) const
+void vtkFunctorInitializable::Initialized(int tid) const
   {
-  IsInitialized[vtkSMPInternalGetTid()] = 1;
+  IsInitialized[tid] = 1;
   }
 
 //--------------------------------------------------------------------------------
