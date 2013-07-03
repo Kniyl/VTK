@@ -7,6 +7,8 @@
 #include "vtkThreadLocal.h"
 #include "vtkSMPMergePoints.h"
 #include "vtkObjectFactory.h"
+#include "vtkIdTypeArray.h"
+#include "vtkUnsignedCharArray.h"
 
 #include "vtkParallelPointMerger.h"
 #include "vtkParallelCellMerger.h"
@@ -182,3 +184,22 @@ void vtkMergeDataSets::MergePolyData(
   DummyFunctor->Delete();
   }
 
+void vtkMergeDataSets::MergeUnstructuredGrid(
+        vtkPoints* outPoints,
+        vtkThreadLocal<vtkPoints>* inPoints,
+        const double bounds[6],
+        vtkPointData* outPD, vtkThreadLocal<vtkPointData>* inPD,
+        vtkCellArray* outCells, vtkThreadLocal<vtkCellArray>* inCells,
+        vtkCellData* outCD, vtkThreadLocal<vtkCellData>* inCD,
+        vtkIdTypeArray* outLocs, vtkThreadLocal<vtkIdTypeArray>* inLocs,
+        vtkUnsignedCharArray* outTypes, vtkThreadLocal<vtkUnsignedCharArray>* inTypes)
+{}
+void vtkMergeDataSets::MergeUnstructuredGrid(
+        vtkSMPMergePoints* outPoints,
+        vtkThreadLocal<vtkSMPMergePoints>* inPoints,
+        vtkPointData* outPD, vtkThreadLocal<vtkPointData>* inPD,
+        vtkCellArray* outCells, vtkThreadLocal<vtkCellArray>* inCells,
+        vtkCellData* outCD, vtkThreadLocal<vtkCellData>* inCD,
+        vtkIdTypeArray* outLocs, vtkThreadLocal<vtkIdTypeArray>* inLocs,
+        vtkUnsignedCharArray* outTypes, vtkThreadLocal<vtkUnsignedCharArray>* inTypes)
+{}

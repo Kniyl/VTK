@@ -45,7 +45,7 @@ public:
     if (outPd) outPd->Register(this);
     }
 
-  void operator ()( vtkIdType id ) const
+  void operator()( vtkIdType id, vtkLocalData* data ) const
     {
     double x[3];
     in->GetPoint(id, x);
@@ -151,7 +151,7 @@ public:
     numCells[3] = _num_of_cells;
     }
 
-  void operator ()( vtkIdType id ) const
+  void operator()( vtkIdType id, vtkLocalData* data ) const
     {
     int loc = cellsInfo->GetCellLocation( id );
     vtkIdType *pSrc, *pDest, Num;

@@ -28,7 +28,7 @@ void test(vtkContourFilter *isosurface)
   vtkTimerLog *timer = vtkTimerLog::New();
   isosurface->SetInputArrayToProcess(0,0,0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "Elevation");
   isosurface->GenerateValues( 150, 0.0, 1.0 );
-  isosurface->UseScalarTreeOff();
+  isosurface->UseScalarTreeOn();
   cerr << "update " << isosurface->GetClassName() << endl;
   double t, t0,t1;
   t = 0;
@@ -131,7 +131,7 @@ int TestSMPPD( int argc, char * argv [] )
   vtkSMPMinMaxTree* tree = vtkSMPMinMaxTree::New();
   isosurface2->SetScalarTree(tree);
   tree->Delete();
-  isosurface2->SetInputConnection( transform->GetOutputPort() );
+  isosurface2->SetInputConnection( aa->GetOutputPort() );
 
   test(isosurface1);
   test(isosurface2);

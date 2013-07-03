@@ -29,12 +29,13 @@ set(SMP_Internals
 
 #components that developers use to make SMP filters from
 set(SMP_Core
-  #vtkParallelTree.cxx #required by TraverseOp
+  vtkParallelTree.cxx #required by TraverseOp
+  vtkLocalData.cxx
   vtkFunctor.cxx #requirement of ForEachOp
   vtkFunctorInitializable.cxx
   vtkParallelOperators.cxx
   vtkMergeDataSets.cxx
-  #vtkThreadLocal.cxx
+  vtkThreadLocal.cxx
   vtkSMPAlgorithm.cxx
   vtkSMPPointSetAlgorithm.cxx
   vtkSMPPolyDataAlgorithm.cxx

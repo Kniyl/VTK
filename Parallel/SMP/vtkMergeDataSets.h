@@ -12,6 +12,8 @@ class vtkCellArray;
 class vtkCellData;
 class vtkTask;
 class vtkIdList;
+class vtkIdTypeArray;
+class vtkUnsignedCharArray;
 
 class VTKPARALLELSMP_EXPORT vtkMergeDataSets : public vtkObject
 {
@@ -66,6 +68,24 @@ class VTKPARALLELSMP_EXPORT vtkMergeDataSets : public vtkObject
         vtkCellArray* outStrips, vtkThreadLocal<vtkCellArray>* inStrips,
         vtkCellData* outCellsData, vtkThreadLocal<vtkCellData>* inCellsData);
 
+    void MergeUnstructuredGrid(
+        vtkPoints* outPoints,
+        vtkThreadLocal<vtkPoints>* inPoints,
+        const double bounds[6],
+        vtkPointData* outPD, vtkThreadLocal<vtkPointData>* inPD,
+        vtkCellArray* outCells, vtkThreadLocal<vtkCellArray>* inCells,
+        vtkCellData* outCD, vtkThreadLocal<vtkCellData>* inCD,
+        vtkIdTypeArray* outLocs, vtkThreadLocal<vtkIdTypeArray>* inLocs,
+        vtkUnsignedCharArray* outTypes, vtkThreadLocal<vtkUnsignedCharArray>* inTypes);
+    void MergeUnstructuredGrid(
+        vtkSMPMergePoints* outPoints,
+        vtkThreadLocal<vtkSMPMergePoints>* inPoints,
+        vtkPointData* outPD, vtkThreadLocal<vtkPointData>* inPD,
+        vtkCellArray* outCells, vtkThreadLocal<vtkCellArray>* inCells,
+        vtkCellData* outCD, vtkThreadLocal<vtkCellData>* inCD,
+        vtkIdTypeArray* outLocs, vtkThreadLocal<vtkIdTypeArray>* inLocs,
+        vtkUnsignedCharArray* outTypes, vtkThreadLocal<vtkUnsignedCharArray>* inTypes);
+        
   protected:
     vtkMergeDataSets();
     ~vtkMergeDataSets();

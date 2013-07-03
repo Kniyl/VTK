@@ -2,6 +2,7 @@
 #define __vtkSMPImplementation_h_
 
 #include <tbb/tbb.h>
+#include <tbb/flow_graph.h>
 
 class TBBInit {
     tbb::task_scheduler_init init;

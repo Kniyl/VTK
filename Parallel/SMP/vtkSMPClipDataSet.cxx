@@ -31,6 +31,60 @@
 
 #include <math.h>
 
+class vtkClipDataSetLocalData : public vtkLocalData
+  {
+    vtkClipDataSetLocalData(const vtkClipDataSetLocalData&);
+    void operator=(const vtkClipDataSetLocalData&);
+  protected:
+    vtkClipDataSetLocalData() :
+        cell(0), cellScalars(0), outPD(0), locator(0)
+      {
+      conn[0] = conn[1] = 0;
+      outCD[0] = outCD[1] = 0;
+      types[0] = types[1] = 0;
+      locs[0] = locs[1] = 0;
+      }
+    ~vtkClipDataSetLocalData(){}
+  public:
+    vtkTypeMacro(vtkClipDataSetLocalData,vtkLocalData);
+    static vtkClipDataSetLocalData* New();
+    void PrintSelf(ostream& os, vtkIndent indent)
+      {
+      this->Superclass::PrintSelf(os,indent);
+      os << indent << "Locator: (" << locator << ")" << endl;
+      if (locator) locator->PrintSelf(os, indent.GetNextIndent());
+      os << indent << "Cell: (" << cell << ")" << endl;
+      if (cell) cell->PrintSelf(os, indent.GetNextIndent());
+      os << indent << "CellScalars: (" << cellScalars << ")" << endl;
+      if (cellScalars) cellScalars->PrintSelf(os, indent.GetNextIndent());
+      os << indent << "OutPD: (" << outPD << ")" << endl;
+      if (outPD) outPD->PrintSelf(os, indent.GetNextIndent());
+      os << indent << "OutCDs: (" << outCD << ")" << endl;
+      if (outCD[0]) outCD[0]->PrintSelf(os, indent.GetNextIndent());
+      if (outCD[1]) outCD[1]->PrintSelf(os, indent.GetNextIndent());
+      os << indent << "Conns: (" << conn << ")" << endl;
+      if (conn[0]) conn[0]->PrintSelf(os, indent.GetNextIndent());
+      if (conn[1]) conn[1]->PrintSelf(os, indent.GetNextIndent());
+      os << indent << "Types: (" << types << ")" << endl;
+      if (types[0]) types[0]->PrintSelf(os, indent.GetNextIndent());
+      if (types[1]) types[1]->PrintSelf(os, indent.GetNextIndent());
+      os << indent << "Locs: (" << locs << ")" << endl;
+      if (locs[0]) locs[0]->PrintSelf(os, indent.GetNextIndent());
+      if (locs[1]) locs[1]->PrintSelf(os, indent.GetNextIndent());
+      }
+
+    vtkGenericCell* cell;
+    vtkFloatArray* cellScalars;
+    vtkPointData* outPD;
+    vtkIncrementalPointLocator* locator;
+    vtkCellArray* conn[2];
+    vtkCellData* outCD[2];
+    vtkUnsignedCharArray* types[2];
+    vtkIdTypeArray* locs[2];
+  };
+
+vtkStandardNewMacro(vtkClipDataSetLocalData);
+
 class GenerateClipValueExecutor : public vtkFunctor
 {
   GenerateClipValueExecutor(const GenerateClipValueExecutor&);
@@ -59,7 +113,7 @@ public:
     clipFunction = f;
     }
 
-  void operator ()(vtkIdType i) const
+  void operator()(vtkIdType i, vtkLocalData* data) const
     {
     double p[3];
     this->input->GetPoint(i,p);
@@ -141,49 +195,70 @@ public:
     input = i; clipScalars = c; inPD = pd; inCD = cd; refLocator = l;
     estimatedSize = e; value = v; insideOut = inside; numOutputs = num;
 
-    input->GetCell(0,cell->NewLocal());
-    cellScalars->NewLocal()->Allocate(VTK_CELL_SIZE);
-    newPoints->SetLocal(pts);
-    locator->SetLocal(l);
-    outPD->SetLocal(out_pd);
+    int tid = this->MasterThreadId;
+    input->GetCell(0,cell->NewLocal(tid));
+    cellScalars->NewLocal(tid)->Allocate(VTK_CELL_SIZE);
+    newPoints->SetLocal(pts,tid);
+    locator->SetLocal(l,tid);
+    outPD->SetLocal(out_pd,tid);
     for (int i = 0; i < num; ++i)
       {
       conn[i] = vtkThreadLocal<vtkCellArray>::New();
-      conn[i]->SetLocal(_conn[i]);
+      conn[i]->SetLocal(_conn[i],tid);
       outCD[i] = vtkThreadLocal<vtkCellData>::New();
-      outCD[i]->SetLocal(_out[i]);
+      outCD[i]->SetLocal(_out[i],tid);
       types[i] = vtkThreadLocal<vtkUnsignedCharArray>::New();
-      types[i]->SetLocal(_types[i]);
+      types[i]->SetLocal(_types[i],tid);
       locs[i] = vtkThreadLocal<vtkIdTypeArray>::New();
-      locs[i]->SetLocal(_locs[i]);
+      locs[i]->SetLocal(_locs[i],tid);
       }
 
-    Initialized();
+    Initialized(tid);
     }
 
-  void Init() const
+  void Init(int tid) const
     {
-    cell->NewLocal();
-    cellScalars->NewLocal()->Allocate(VTK_CELL_SIZE);
-    vtkPoints* pts = newPoints->NewLocal();
+    cell->NewLocal(tid);
+    cellScalars->NewLocal(tid)->Allocate(VTK_CELL_SIZE);
+    vtkPoints* pts = newPoints->NewLocal(tid);
     pts->Allocate(estimatedSize,estimatedSize/2);
-    outPD->NewLocal()->InterpolateAllocate(inPD,estimatedSize,estimatedSize/2);
-    locator->NewLocal(refLocator)->InitPointInsertion (pts, input->GetBounds());
+    outPD->NewLocal(tid)->InterpolateAllocate(inPD,estimatedSize,estimatedSize/2);
+    locator->NewLocal(refLocator,tid)->InitPointInsertion (pts, input->GetBounds());
     for (int i = 0; i < numOutputs; ++i)
       {
-      vtkCellArray* _conn = conn[i]->NewLocal();
+      vtkCellArray* _conn = conn[i]->NewLocal(tid);
       _conn->Allocate(estimatedSize,estimatedSize/2);
       _conn->InitTraversal();
-      outCD[i]->NewLocal()->CopyAllocate(inCD,estimatedSize,estimatedSize/2);
-      types[i]->NewLocal()->Allocate(estimatedSize,estimatedSize/2);
-      locs[i]->NewLocal()->Allocate(estimatedSize,estimatedSize/2);
+      outCD[i]->NewLocal(tid)->CopyAllocate(inCD,estimatedSize,estimatedSize/2);
+      types[i]->NewLocal(tid)->Allocate(estimatedSize,estimatedSize/2);
+      locs[i]->NewLocal(tid)->Allocate(estimatedSize,estimatedSize/2);
       }
-    Initialized();
+    Initialized(tid);
     }
 
-  void operator ()(vtkIdType cellId) const
+  vtkLocalData* getLocal(int tid) const
     {
-    vtkGenericCell* cell = this->cell->GetLocal();
+    vtkClipDataSetLocalData* data =
+      vtkClipDataSetLocalData::New();
+    data->cell = this->cell->GetLocal(tid);
+    data->cellScalars = this->cellScalars->GetLocal(tid);
+    data->outPD = this->outPD->GetLocal(tid);
+    data->locator = this->locator->GetLocal(tid);
+    for (int i = 0; i < numOutputs; ++i)
+      {
+      data->conn[i] = this->conn[i]->GetLocal(tid);
+      data->outCD[i] = this->outCD[i]->GetLocal(tid);
+      data->types[i] = this->types[i]->GetLocal(tid);
+      data->locs[i] = this->locs[i]->GetLocal(tid);
+      }
+    return data;
+    }
+
+  void operator()(vtkIdType cellId, vtkLocalData* d) const
+    {
+    vtkClipDataSetLocalData* data =
+      static_cast<vtkClipDataSetLocalData*>(d);
+    vtkGenericCell* cell = data->cell;
     input->GetCell(cellId,cell);
     vtkPoints* cellPts = cell->GetPoints();
     vtkIdList* cellIds = cell->GetPointIds();
@@ -193,22 +268,24 @@ public:
     for (int i=0; i < npts; i++ )
       {
       double s = clipScalars->GetComponent(cellIds->GetId(i), 0);
-      cellScalars->GetLocal()->InsertTuple(i, &s);
+      data->cellScalars->InsertTuple(i, &s);
       }
 
     // perform the clipping
     int num[2];
-    num[0] = conn[0]->GetLocal()->GetNumberOfCells();
-    cell->Clip(value, cellScalars->GetLocal(), this->locator->GetLocal(), conn[0]->GetLocal(),
-               inPD, outPD->GetLocal(), inCD, cellId, outCD[0]->GetLocal(), this->insideOut);
-    num[0] = conn[0]->GetLocal()->GetNumberOfCells() - num[0];
+    num[0] = data->conn[0]->GetNumberOfCells();
+    cell->Clip(value, data->cellScalars, data->locator,
+        data->conn[0], inPD, data->outPD, inCD, cellId,
+        data->outCD[0], this->insideOut);
+    num[0] = data->conn[0]->GetNumberOfCells() - num[0];
 
     if ( numOutputs > 1 )
       {
-      num[1] = conn[1]->GetLocal()->GetNumberOfCells();
-      cell->Clip(value, cellScalars->GetLocal(), this->locator->GetLocal(), conn[1]->GetLocal(),
-                 inPD, outPD->GetLocal(), inCD, cellId, outCD[1]->GetLocal(), this->insideOut);
-      num[1] = conn[1]->GetLocal()->GetNumberOfCells() - num[0];
+      num[1] = data->conn[1]->GetNumberOfCells();
+      cell->Clip(value, data->cellScalars, data->locator,
+          data->conn[1], inPD, data->outPD, inCD, cellId,
+          data->outCD[1], this->insideOut);
+      num[1] = data->conn[1]->GetNumberOfCells() - num[0];
       }
 
     for (int i=0; i<numOutputs; i++) //for both outputs
@@ -221,13 +298,13 @@ public:
           //(nCell0Faces, nFace0Pts, i, j, k, nFace1Pts, i, j, k, ...).
           //But we don't need to deal with it here. The special case is handled
           //by vtkUnstructuredGrid::SetCells(), which will be called next.
-          types[i]->GetLocal()->InsertNextValue(VTK_POLYHEDRON);
+          data->types[i]->InsertNextValue(VTK_POLYHEDRON);
           }
         else
           {
-          locs[i]->GetLocal()->InsertNextValue(conn[i]->GetLocal()->GetTraversalLocation());
+          data->locs[i]->InsertNextValue(data->conn[i]->GetTraversalLocation());
           vtkIdType* pts;
-          conn[i]->GetLocal()->GetNextCell(npts,pts);
+          data->conn[i]->GetNextCell(npts,pts);
 
           int cellType = 0;
           //For each new cell added, got to set the type of the cell
@@ -251,7 +328,7 @@ public:
               break;
             } //switch
 
-          types[i]->GetLocal()->InsertNextValue(cellType);
+          data->types[i]->InsertNextValue(cellType);
           }
         } //for each new cell
       } //for both outputs
@@ -499,15 +576,25 @@ int vtkSMPClipDataSet::RequestData(
     {
     vtkThreadLocal<vtkSMPMergePoints>* partialMeshes;
     functor->locator->FillDerivedThreadLocal(partialMeshes);
-//    mergeOp->MergeUnstructuredGrid(parallelLocator, partialMeshes, outPD, functor->outPD, conn[0], functor->conn[0], 0, 0, 0, 0, 0, 0, outCD[0], functor->outCD[0], 1);
+    mergeOp->MergeUnstructuredGrid(
+        parallelLocator, partialMeshes,
+        outPD, functor->outPD,
+        conn[0], functor->conn[0],
+        outCD[0], functor->outCD[0],
+        locs[0], functor->locs[0],
+        types[0], functor->types[0]);
     partialMeshes->Delete();
     }
   else
     {
-//    mergeOp->MergeUnstructuredGrid(newPoints, functor->newPoints, input->GetBounds(), outPD, functor->outPD, conn[0], functor->conn[0], 0, 0, 0, 0, 0, 0, outCD[0], functor->outCD[0], 1);
+    mergeOp->MergeUnstructuredGrid(
+        newPoints, functor->newPoints, input->GetBounds(),
+        outPD, functor->outPD,
+        conn[0], functor->conn[0],
+        outCD[0], functor->outCD[0],
+        locs[0], functor->locs[0],
+        types[0], functor->types[0]);
     }
-  mergeOp->Delete();
-  functor->Delete();
 
   if ( this->ClipFunction )
     {
@@ -523,12 +610,21 @@ int vtkSMPClipDataSet::RequestData(
 
   if ( this->GenerateClippedOutput )
     {
+    mergeOp->MergeUnstructuredGrid(
+        0,0,0,0,
+        conn[1], functor->conn[1],
+        outCD[1], functor->outCD[1],
+        locs[1], functor->locs[1],
+        types[1], functor->types[1]);
     clippedOutput->SetPoints(newPoints);
     clippedOutput->SetCells(types[1], locs[1], conn[1]);
     conn[1]->Delete();
     types[1]->Delete();
     locs[1]->Delete();
     }
+
+  mergeOp->Delete();
+  functor->Delete();
 
   newPoints->Delete();
   this->Locator->Initialize();//release any extra memory

@@ -61,7 +61,7 @@ void vtkDummyMergeFunctor::PrintSelf(ostream &os, vtkIndent indent)
 }
 
 //------------------------------------------------------------------------------
-void vtkDummyMergeFunctor::operator ()( vtkIdType pointId ) const
+void vtkDummyMergeFunctor::operator()( vtkIdType pointId, vtkLocalData* data ) const
 {
   outputLocator->AddPointIdInBucket( pointId );
 }

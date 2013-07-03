@@ -11,6 +11,31 @@
 #include "vtkDoubleArray.h"
 #include "vtkGenericCell.h"
 
+class MinMaxTreeLocalData : public vtkLocalData
+  {
+    MinMaxTreeLocalData(const MinMaxTreeLocalData&);
+    void operator=(const MinMaxTreeLocalData&);
+  protected:
+    MinMaxTreeLocalData() : TLS_Cell(0), TLS_CellScalars(0) {}
+    ~MinMaxTreeLocalData() {}
+  public:
+    vtkTypeMacro(MinMaxTreeLocalData,vtkLocalData);
+    static MinMaxTreeLocalData* New();
+    void PrintSelf(ostream& os, vtkIndent indent)
+      {
+      this->Superclass::PrintSelf(os,indent);
+      os << indent << "Cells: (" << TLS_Cell << ")" << endl;
+      if (TLS_Cell) TLS_Cell->PrintSelf(os,indent.GetNextIndent());
+      os << indent << "CellScalars: (" << TLS_CellScalars << ")" << endl;
+      if (TLS_CellScalars) TLS_CellScalars->PrintSelf(os,indent.GetNextIndent());
+      }
+
+    vtkGenericCell* TLS_Cell;
+    vtkDoubleArray* TLS_CellScalars;
+  };
+
+vtkStandardNewMacro(MinMaxTreeLocalData);
+
 class vtkScalarNode {};
 
 template <class TScalar>
@@ -70,8 +95,21 @@ public:
     Max = t->TreeSize;
     }
 
-  void operator ()( vtkIdType index ) const
+  vtkLocalData* getLocal(int tid) const
     {
+    MinMaxTreeLocalData* data = MinMaxTreeLocalData::New();
+    data->TLS_Cell = this->TLS_Cell->GetLocal(tid);
+    if (!data->TLS_Cell)
+      data->TLS_Cell = this->TLS_Cell->NewLocal(tid);
+    data->TLS_CellScalars = this->TLS_CellScalars->GetLocal(tid);
+    if (!data->TLS_CellScalars)
+      data->TLS_CellScalars = this->TLS_CellScalars->GetLocal(tid);
+    return data;
+    }
+
+  void operator()( vtkIdType index, vtkLocalData* d ) const
+    {
+    MinMaxTreeLocalData* data = static_cast<MinMaxTreeLocalData*>(d);
     double my_min = VTK_DOUBLE_MAX;
     double my_max = -VTK_DOUBLE_MAX;
 
@@ -79,12 +117,8 @@ public:
 
     if ( cellId < this->Size )
       {
-      vtkGenericCell* cell = this->TLS_Cell->GetLocal( );
-      if ( !cell )
-        cell = this->TLS_Cell->NewLocal( );
-      vtkDoubleArray* cellScalars = this->TLS_CellScalars->GetLocal( );
-      if ( !cellScalars )
-        cellScalars = this->TLS_CellScalars->NewLocal( );
+      vtkGenericCell* cell = data->TLS_Cell;
+      vtkDoubleArray* cellScalars = data->TLS_CellScalars;
       double* s;
       for ( vtkIdType i = 0; i < this->BF && cellId < this->Size; ++i, ++cellId )
         {
@@ -287,7 +321,7 @@ void vtkSMPMinMaxTree::InitTraversal(double scalarValue)
   this->TreeIndex = this->TreeSize;
   }
 
-int vtkSMPMinMaxTree::TraverseNode( vtkIdType id, int lvl, vtkFunctor* function ) const
+int vtkSMPMinMaxTree::TraverseNode( vtkIdType id, int lvl, vtkFunctor* function, vtkLocalData* data ) const
   {
   if ( id >= this->TreeSize )
     {
@@ -306,7 +340,7 @@ int vtkSMPMinMaxTree::TraverseNode( vtkIdType id, int lvl, vtkFunctor* function 
     vtkIdType max_id = this->DataSet->GetNumberOfCells();
     for ( vtkIdType i = 0; i < this->BranchingFactor && cell_id < max_id; ++i, ++cell_id )
       {
-      (*function)( cell_id );
+      (*function)( cell_id, data );
       }
     return 0;
     }

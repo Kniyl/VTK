@@ -58,7 +58,7 @@ public:
   vtkOffsetManager* polyOffset;
   vtkOffsetManager* stripOffset;
 
-  void operator ()( vtkIdType pointId ) const;
+  void operator()( vtkIdType pointId, vtkLocalData* data ) const;
 
   vtkIdType GetNumberOfCells() const { return NumberOfCells; }
   vtkIdType GetNumberOfPoints() const { return NumberOfPoints; }

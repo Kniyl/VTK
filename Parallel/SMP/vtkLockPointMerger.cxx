@@ -18,7 +18,7 @@ void vtkLockPointMerger::PrintSelf(ostream &os, vtkIndent indent)
 }
 
 //------------------------------------------------------------------------------
-void vtkLockPointMerger::operator()( vtkIdType id ) const
+void vtkLockPointMerger::operator()( vtkIdType id, vtkLocalData* data ) const
 {
   vtkThreadLocal<vtkPoints>::iterator itPoints = this->Functor->InPoints->Begin();
   vtkThreadLocal<vtkPointData>::iterator itPd = this->Functor->InPd->Begin();
