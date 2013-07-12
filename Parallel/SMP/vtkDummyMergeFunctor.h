@@ -4,7 +4,8 @@
 //used to initialize locator especially in the case of skip_threads
 
 #include "vtkParallelSMPModule.h" // For export macro
-#include "vtkFunctor.h"
+#include "vtkRangeFunctor.h"
+#include "vtkRange1D.h"
 #include "vtkThreadLocal.h"
 
 class vtkCellData;
@@ -15,7 +16,7 @@ class vtkPointData;
 class vtkPoints;
 class vtkSMPMergePoints;
 
-class VTKPARALLELSMP_EXPORT vtkDummyMergeFunctor : public vtkFunctor
+class VTKPARALLELSMP_EXPORT vtkDummyMergeFunctor : public vtkRangeFunctor
 {
   vtkDummyMergeFunctor ( const vtkDummyMergeFunctor& );
   void operator =( const vtkDummyMergeFunctor& );
@@ -28,7 +29,7 @@ protected:
   ~vtkDummyMergeFunctor ();
 
 public:
-  vtkTypeMacro(vtkDummyMergeFunctor,vtkFunctor);
+  vtkTypeMacro(vtkDummyMergeFunctor,vtkRangeFunctor);
   static vtkDummyMergeFunctor* New();
   void PrintSelf(ostream &os, vtkIndent indent);
 
@@ -58,7 +59,7 @@ public:
   vtkOffsetManager* polyOffset;
   vtkOffsetManager* stripOffset;
 
-  void operator()( vtkIdType pointId, vtkLocalData* data ) const;
+  void operator()(vtkRange*) const;
 
   vtkIdType GetNumberOfCells() const { return NumberOfCells; }
   vtkIdType GetNumberOfPoints() const { return NumberOfPoints; }

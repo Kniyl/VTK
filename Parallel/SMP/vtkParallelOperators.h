@@ -5,8 +5,10 @@
 #include "vtkObject.h"
 #include <vector>
 
-class vtkFunctor;
-class vtkFunctorInitializable;
+class vtkRangeFunctor;
+class vtkRangeFunctorInitializable;
+class vtkTreeFunctor;
+class vtkTreeFunctorInitializable;
 class vtkParallelTree;
 
 class VTKPARALLELSMP_EXPORT vtkParallelOperators : public vtkObject
@@ -26,30 +28,32 @@ class VTKPARALLELSMP_EXPORT vtkParallelOperators : public vtkObject
     // ForEach template : parallel loop over an iterator
     static void ForEach(
       vtkIdType first, vtkIdType last,
-      const vtkFunctor* op, int grain = 0
+      const vtkRangeFunctor* op, int grain = 0
     );
 
     static void ForEach(
       vtkIdType first, vtkIdType last,
-      const vtkFunctorInitializable* f, int grain = 0
+      const vtkRangeFunctorInitializable* f, int grain = 0
     );
  
     // Same as ForEach but with a guaranteed static partitioning
+    // For now it is only an alias, TODO implement it in each
+    // runtime.
     static void StaticForEach(
         vtkIdType first, vtkIdType last,
-        const vtkFunctor* op, int grain = 0)
+        const vtkRangeFunctor* op, int grain = 0)
       {
       ForEach(first,last,op,grain);
       } 
 
     static void StaticForEach(
         vtkIdType first, vtkIdType last,
-        const vtkFunctorInitializable* op, int grain = 0)
+        const vtkRangeFunctorInitializable* op, int grain = 0)
       {
       ForEach(first,last,op,grain);
       } 
 
-    static void Traverse(const vtkParallelTree* Tree, vtkFunctor* func);
+    static void Traverse(const vtkParallelTree* Tree, vtkTreeFunctor* func);
 };
 
 #endif //__vtkParallelOperators_h__

@@ -1,7 +1,10 @@
 #include "vtkSMPImplementation.h"
 #include "vtkParallelOperators.h"
-#include "vtkFunctor.h"
-#include "vtkFunctorInitializable.h"
+#include "vtkTreeFunctor.h"
+#include "vtkTreeFunctorInitializable.h"
+#include "vtkRangeFunctor.h"
+#include "vtkRangeFunctorInitializable.h"
+#include "vtkRange1D.h"
 #include "vtkParallelTree.h"
 #include "vtkTask.h"
 #include "vtkMergeDataSets.h"
@@ -57,7 +60,7 @@ typedef struct tree_work
 {
   kaapi_workqueue_t wq;
   const vtkParallelTree* Tree;
-  vtkFunctor* op;
+  vtkTreeFunctor* op;
   int max_level;
   int cur_level;
   vtkIdType branching_factor;
@@ -91,7 +94,7 @@ static void thief_entrypoint( void* args, kaapi_thread_t* thread )
   work_t* const work = (work_t*)(args);
 
   int tid = kaapi_get_self_kid();
-  vtkFunctorInitializable* iop = vtkFunctorInitializable::SafeDownCast( work->op );
+  vtkTreeFunctorInitializable* iop = vtkTreeFunctorInitializable::SafeDownCast( work->op );
   if ( iop && iop->ShouldInitialize(tid) )
     iop->Init(tid);
   vtkLocalData* data = work->op->getLocal(tid);
@@ -163,25 +166,18 @@ static int splitter(
   return 0;
   }
 
-inline void doFor( int32_t b, int32_t e, int32_t tid, const vtkFunctor* o )
+inline void doFor( int32_t b, int32_t e, int32_t tid, const vtkRangeFunctor* o )
   {
-  vtkLocalData* data = o->getLocal(tid);
-  for (int32_t k = b; k < e; ++k)
-    {
-    (*o)( k, data );
-    }
-  data->Delete();
+  vtkRange1D* range = vtkRange1D::New();
+  range->Setup(b,e,tid);
+  (*o)(range);
+  range->Delete();
   }
-inline void doForInit( int32_t b, int32_t e, int32_t tid, const vtkFunctorInitializable* o )
+inline void doForInit( int32_t b, int32_t e, int32_t tid, const vtkRangeFunctorInitializable* o )
   {
   if (o->ShouldInitialize(tid))
     o->Init(tid);
-  vtkLocalData* data = o->getLocal(tid);
-  for (int32_t k = b; k < e; ++k)
-    {
-    (*o)( k, data );
-    }
-  data->Delete();
+  doFor(b,e,tid,o);
   }
 
 //--------------------------------------------------------------------------------
@@ -195,7 +191,7 @@ int vtkSMPInternalGetTid()
   return kaapi_get_self_kid();
 }
 
-void vtkParallelOperators::ForEach ( vtkIdType first, vtkIdType last, const vtkFunctor* op, int grain )
+void vtkParallelOperators::ForEach ( vtkIdType first, vtkIdType last, const vtkRangeFunctor* op, int grain )
 {
   vtkIdType n = last - first;
   int g = grain ? grain : sqrt(n);
@@ -208,7 +204,7 @@ void vtkParallelOperators::ForEach ( vtkIdType first, vtkIdType last, const vtkF
   kaapic_foreach_attr_destroy(&attr);
 }
 
-void vtkParallelOperators::ForEach ( vtkIdType first, vtkIdType last, const vtkFunctorInitializable* op, int grain )
+void vtkParallelOperators::ForEach ( vtkIdType first, vtkIdType last, const vtkRangeFunctorInitializable* op, int grain )
 {
   vtkIdType n = last - first;
   int g = grain ? grain : sqrt(n);
@@ -276,7 +272,7 @@ void vtkMergeDataSets::Parallel(
 //    kaapi_end_parallel( KAAPI_SCHEDFLAG_DEFAULT );
 }
 
-void vtkParallelOperators::Traverse( const vtkParallelTree *Tree, vtkFunctor* func )
+void vtkParallelOperators::Traverse( const vtkParallelTree *Tree, vtkTreeFunctor* func )
 {
   work_t work;
   kaapi_workqueue_index_t i, nil;
@@ -344,7 +340,12 @@ void vtkParallelOperators::Traverse( const vtkParallelTree *Tree, vtkFunctor* fu
 
 }
 
-void vtkFunctor::ComputeMasterTID()
+void vtkTreeFunctor::ComputeMasterTID()
+  {
+  this->MasterThreadId = kaapi_get_self_kid();
+  }
+
+void vtkRangeFunctor::ComputeMasterTID()
   {
   this->MasterThreadId = kaapi_get_self_kid();
   }

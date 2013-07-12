@@ -15,7 +15,7 @@
 #include "vtkSMPWarpVector.h"
 
 #include "vtkCellData.h"
-#include "vtkFunctor.h"
+#include "vtkRangeFunctor.h"
 #include "vtkInformation.h"
 #include "vtkInformationVector.h"
 #include "vtkObjectFactory.h"
@@ -27,7 +27,8 @@
 #include "vtkArrayIteratorTemplate.h"
 
 #include "vtkParallelOperators.h"
-#include "vtkFunctor.h"
+#include "vtkRangeFunctor.h"
+#include "vtkRange1D.h"
 
 #define vtkDataArrayIteratorTemplateMacro(call)                                 \
   vtkArrayIteratorTemplateMacroCase(VTK_DOUBLE, double, call);              \
@@ -67,7 +68,7 @@ vtkSMPWarpVector::~vtkSMPWarpVector()
 
 //----------------------------------------------------------------------------
 template <class T1, class T2>
-struct vtkSMPWarpVectorOp : public vtkFunctor
+struct vtkSMPWarpVectorOp : public vtkRangeFunctor
 {
   static vtkSMPWarpVectorOp<T1,T2>* New() { return new vtkSMPWarpVectorOp<T1,T2>(); }
 
@@ -76,15 +77,19 @@ struct vtkSMPWarpVectorOp : public vtkFunctor
   vtkArrayIteratorTemplate<T2> *inVecIter;
   T1 scaleFactor;
 
-  void  operator()( vtkIdType index, vtkLocalData* data ) const
+  void  operator()( vtkRange* r ) const
     {
-    T1* inTuple = inIter->GetTuple(index);
-    T1* outTuple = outIter->GetTuple(index);
-    T2* inVecTuple = inVecIter->GetTuple(index);
+    vtkRange1D* range = vtkRange1D::SafeDownCast(r);
+    for (vtkIdType index = range->Begin(); index < range->End(); ++index)
+      {
+      T1* inTuple = inIter->GetTuple(index);
+      T1* outTuple = outIter->GetTuple(index);
+      T2* inVecTuple = inVecIter->GetTuple(index);
 
-    outTuple[0] = inTuple[0] + scaleFactor * (T1)(inVecTuple[0]);
-    outTuple[1] = inTuple[1] + scaleFactor * (T1)(inVecTuple[1]);
-    outTuple[2] = inTuple[2] + scaleFactor * (T1)(inVecTuple[2]);
+      outTuple[0] = inTuple[0] + scaleFactor * (T1)(inVecTuple[0]);
+      outTuple[1] = inTuple[1] + scaleFactor * (T1)(inVecTuple[1]);
+      outTuple[2] = inTuple[2] + scaleFactor * (T1)(inVecTuple[2]);
+      }
     }
 protected:
   vtkSMPWarpVectorOp() {}

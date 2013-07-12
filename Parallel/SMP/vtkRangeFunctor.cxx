@@ -1,23 +1,16 @@
-#include "vtkFunctor.h"
+#include "vtkRangeFunctor.h"
 
 //======================================================================================
-vtkFunctor::vtkFunctor()
+vtkRangeFunctor::vtkRangeFunctor()
   {
   this->ComputeMasterTID();
   }
 
 //--------------------------------------------------------------------------------
-vtkFunctor::~vtkFunctor() { }
+vtkRangeFunctor::~vtkRangeFunctor() { }
 
 //--------------------------------------------------------------------------------
-void vtkFunctor::PrintSelf(ostream &os, vtkIndent indent)
+void vtkRangeFunctor::PrintSelf(ostream &os, vtkIndent indent)
   {
   this->Superclass::PrintSelf( os, indent );
-  }
-
-//--------------------------------------------------------------------------------
-vtkLocalData* vtkFunctor::getLocal(int tid) const
-  {
-  vtkLocalData* data = vtkLocalData::New();
-  return data;
   }
