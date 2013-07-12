@@ -1,11 +1,14 @@
 #include "vtkParallelOperators.h"
-#include "vtkFunctor.h"
-#include "vtkFunctorInitializable.h"
+#include "vtkTreeFunctor.h"
+#include "vtkTreeFunctorInitializable.h"
+#include "vtkRangeFunctor.h"
+#include "vtkRangeFunctorInitializable.h"
+#include "vtkRange1D.h"
 #include "vtkParallelTree.h"
 #include "vtkTask.h"
 #include "vtkMergeDataSets.h"
 
-void sequential_traverse( vtkIdType index, int lvl, vtkIdType BranchingFactor, const vtkParallelTree* Tree, vtkFunctor* func, vtkLocalData* data )
+void sequential_traverse( vtkIdType index, int lvl, vtkIdType BranchingFactor, const vtkParallelTree* Tree, vtkTreeFunctor* func, vtkLocalData* data )
   {
   if ( Tree->TraverseNode( index, lvl, func, data ) )
     {
@@ -26,25 +29,25 @@ int vtkSMPInternalGetNumberOfThreads()
   return 1;
 }
 
-void vtkParallelOperators::ForEach( vtkIdType first, vtkIdType last, const vtkFunctor* op, int grain )
+void vtkParallelOperators::ForEach( vtkIdType first, vtkIdType last, const vtkRangeFunctor* op, int grain )
 {
-  vtkLocalData* data = op->getLocal(0);
-  for ( ; first < last; ++first )
-    (*op)( first, data );
-  data->Delete();
+  vtkRange1D* range = vtkRange1D::New();
+  range->Setup(first,last,0);
+  (*op)( range );
+  range->Delete();
 }
 
-void vtkParallelOperators::ForEach( vtkIdType first, vtkIdType last, const vtkFunctorInitializable* f, int grain )
+void vtkParallelOperators::ForEach( vtkIdType first, vtkIdType last, const vtkRangeFunctorInitializable* f, int grain )
 {
   if ( f->ShouldInitialize(0) )
     f->Init(0);
-  vtkLocalData* data = f->getLocal(0);
-  for ( ; first < last; ++first )
-    (*f)( first, data );
-  data->Delete();
+  vtkRange1D* range = vtkRange1D::New();
+  range->Setup(first,last,0);
+  (*f)( range );
+  range->Delete();
 }
 
-void vtkParallelOperators::Traverse( const vtkParallelTree* Tree, vtkFunctor* func )
+void vtkParallelOperators::Traverse( const vtkParallelTree* Tree, vtkTreeFunctor* func )
 {
   int lvl;
   vtkIdType bf;
@@ -96,7 +99,12 @@ void vtkMergeDataSets::Parallel(
                        offset8[0] );
 }
 
-void vtkFunctor::ComputeMasterTID()
+void vtkRangeFunctor::ComputeMasterTID()
+  {
+  this->MasterThreadId = 0;
+  }
+
+void vtkTreeFunctor::ComputeMasterTID()
   {
   this->MasterThreadId = 0;
   }

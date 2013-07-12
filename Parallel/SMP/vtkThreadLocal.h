@@ -9,8 +9,6 @@
 
 class vtkCellArray;
 class vtkCellData;
-class vtkFunctor;
-class vtkFunctorIntializable;
 class vtkParallelTree;
 class vtkPointData;
 class vtkPoints;

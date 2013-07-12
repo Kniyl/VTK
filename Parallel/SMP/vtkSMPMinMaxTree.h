@@ -6,7 +6,7 @@
 #include "vtkSimpleScalarTree.h"
 
 class vtkGenericCell;
-class vtkFunctor;
+class vtkTreeFunctor;
 class InitializeFunctor;
 
 class VTKPARALLELSMP_EXPORT vtkSMPMinMaxTree : public vtkSimpleScalarTree, public vtkParallelTree
@@ -27,7 +27,7 @@ public:
   void BuildTree();
   void InitTraversal(double scalarValue);
 
-  virtual int TraverseNode( vtkIdType id, int lvl, vtkFunctor* function, vtkLocalData* data ) const;
+  virtual int TraverseNode( vtkIdType id, int lvl, vtkTreeFunctor* function, vtkLocalData* data ) const;
   virtual void GetTreeSize ( int& max_level, vtkIdType& branching_factor ) const;
 
 };

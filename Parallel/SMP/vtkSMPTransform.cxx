@@ -1,13 +1,13 @@
 #include "vtkSMPTransform.h"
 #include "vtkDataArray.h"
-#include "vtkFunctor.h"
 #include "vtkMath.h"
 #include "vtkMatrix4x4.h"
 #include "vtkPoints.h"
 #include "vtkObjectFactory.h"
 
 #include "vtkParallelOperators.h"
-#include "vtkFunctor.h"
+#include "vtkRangeFunctor.h"
+#include "vtkRange1D.h"
 
 #include <stdlib.h>
 
@@ -675,8 +675,8 @@ void vtkSMPTransform::InternalTransformDerivative(const double in[3],
 // derivative, while vectors are simply multiplied by the derivative.
 // Note that the derivative of the inverse transform is simply the
 // inverse of the derivative of the forward transform.
-struct AllModificator : public vtkFunctor {
-  vtkTypeMacro(AllModificator,vtkFunctor);
+struct AllModificator : public vtkRangeFunctor {
+  vtkTypeMacro(AllModificator,vtkRangeFunctor);
   static AllModificator* New();
   void PrintSelf(ostream &os, vtkIndent indent)
   {
@@ -691,26 +691,30 @@ struct AllModificator : public vtkFunctor {
   vtkDataArray* outVcs;
   double (*matrix)[4];
   double (*matrixInvTr)[4];
-  void operator()( vtkIdType id, vtkLocalData* data ) const
-  {
+  void operator()( vtkRange* r ) const
+    {
+    vtkRange1D* range = vtkRange1D::SafeDownCast(r);
     double point[3];
-    inPts->GetPoint(id, point);
-    vtkSMPTransformPoint(matrix, point, point);
-    outPts->SetPoint(id, point);
-    if (inVcs)
-    {
-      inVcs->GetTuple(id, point);
-      vtkSMPTransformVector(matrix, point, point);
-      outVcs->SetTuple(id, point);
+    for (vtkIdType id = range->Begin(); id < range->End(); ++id)
+      {
+      inPts->GetPoint(id, point);
+      vtkSMPTransformPoint(matrix, point, point);
+      outPts->SetPoint(id, point);
+      if (inVcs)
+        {
+        inVcs->GetTuple(id, point);
+        vtkSMPTransformVector(matrix, point, point);
+        outVcs->SetTuple(id, point);
+        }
+      if (inNms)
+        {
+        inNms->GetTuple(id, point);
+        vtkSMPTransformVector(matrixInvTr, point, point);
+        vtkMath::Normalize( point );
+        outNms->SetTuple(id, point);
+        }
+      }
     }
-    if (inNms)
-    {
-      inNms->GetTuple(id, point);
-      vtkSMPTransformVector(matrixInvTr, point, point);
-      vtkMath::Normalize( point );
-      outNms->SetTuple(id, point);
-    }
-  }
 protected:
   AllModificator() {}
   ~AllModificator() {}
@@ -754,8 +758,8 @@ void vtkSMPTransform::TransformPointsNormalsVectors(vtkPoints *inPts,
 }
 
 //----------------------------------------------------------------------------
-struct PtsModificator : public vtkFunctor {
-  vtkTypeMacro(PtsModificator,vtkFunctor);
+struct PtsModificator : public vtkRangeFunctor {
+  vtkTypeMacro(PtsModificator,vtkRangeFunctor);
   static PtsModificator* New();
   void PrintSelf(ostream &os, vtkIndent indent)
   {
@@ -765,13 +769,17 @@ struct PtsModificator : public vtkFunctor {
   vtkPoints* inPts;
   vtkPoints* outPts;
   double (*matrix)[4];
-  void operator() ( vtkIdType id, vtkLocalData* data ) const
-  {
+  void operator() ( vtkRange* r ) const
+    {
+    vtkRange1D* range = vtkRange1D::SafeDownCast(r);
     double point[3];
-    inPts->GetPoint( id, point );
-    vtkSMPTransformPoint( matrix, point, point );
-    outPts->SetPoint( id, point );
-  }
+    for (vtkIdType id = range->Begin(); id < range->End(); ++id)
+      {
+      inPts->GetPoint( id, point );
+      vtkSMPTransformPoint( matrix, point, point );
+      outPts->SetPoint( id, point );
+      }
+    }
 protected:
   PtsModificator() {}
   ~PtsModificator() {}
@@ -799,8 +807,8 @@ void vtkSMPTransform::TransformPoints(vtkPoints *inPts,
 }
 
 //----------------------------------------------------------------------------
-struct NmsModificator : public vtkFunctor {
-  vtkTypeMacro(NmsModificator,vtkFunctor);
+struct NmsModificator : public vtkRangeFunctor {
+  vtkTypeMacro(NmsModificator,vtkRangeFunctor);
   static NmsModificator* New();
   void PrintSelf(ostream &os, vtkIndent indent)
   {
@@ -810,14 +818,18 @@ struct NmsModificator : public vtkFunctor {
   vtkDataArray* inNms;
   vtkDataArray* outNms;
   double (*matrix)[4];
-  void operator() ( vtkIdType id, vtkLocalData* data ) const
-  {
+  void operator() ( vtkRange* r ) const
+    {
+    vtkRange1D* range = vtkRange1D::SafeDownCast(r);
     double norm[3];
-    inNms->GetTuple( id, norm );
-    vtkSMPTransformVector( matrix, norm, norm );
-    vtkMath::Normalize( norm );
-    outNms->SetTuple( id, norm );
-  }
+    for (vtkIdType id = range->Begin(); id < range->End(); ++id)
+      {
+      inNms->GetTuple( id, norm );
+      vtkSMPTransformVector( matrix, norm, norm );
+      vtkMath::Normalize( norm );
+      outNms->SetTuple( id, norm );
+      }
+    }
 protected:
   NmsModificator() {}
   ~NmsModificator() {}
@@ -852,8 +864,8 @@ void vtkSMPTransform::TransformNormals(vtkDataArray *inNms,
 }
 
 //----------------------------------------------------------------------------
-struct VcsModificator : public vtkFunctor {
-  vtkTypeMacro(VcsModificator,vtkFunctor);
+struct VcsModificator : public vtkRangeFunctor {
+  vtkTypeMacro(VcsModificator,vtkRangeFunctor);
   static VcsModificator* New();
   void PrintSelf(ostream &os, vtkIndent indent)
   {
@@ -863,13 +875,17 @@ struct VcsModificator : public vtkFunctor {
   vtkDataArray* inVcs;
   vtkDataArray* outVcs;
   double (*matrix)[4];
-  void operator() ( vtkIdType id, vtkLocalData* data ) const
-  {
+  void operator() ( vtkRange* r ) const
+    {
+    vtkRange1D* range = vtkRange1D::SafeDownCast(r);
     double vec[3];
-    inVcs->GetTuple( id, vec );
-    vtkSMPTransformVector( matrix, vec, vec );
-    outVcs->SetTuple( id, vec );
-  }
+    for (vtkIdType id = range->Begin(); id < range->End(); ++id)
+      {
+      inVcs->GetTuple( id, vec );
+      vtkSMPTransformVector( matrix, vec, vec );
+      outVcs->SetTuple( id, vec );
+      }
+    }
 protected:
   VcsModificator() {}
   ~VcsModificator() {}

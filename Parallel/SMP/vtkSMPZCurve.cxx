@@ -2,7 +2,6 @@
 
 #include "vtkCellData.h"
 #include "vtkDataSet.h"
-#include "vtkFunctor.h"
 #include "vtkGenericCell.h"
 #include "vtkIdList.h"
 #include "vtkInformation.h"
@@ -15,7 +14,8 @@
 #include "vtkPointSet.h"
 #include "vtkPolyData.h"
 #include "vtkParallelOperators.h"
-#include "vtkFunctor.h"
+#include "vtkRangeFunctor.h"
+#include "vtkRange1D.h"
 #include "vtkUnstructuredGrid.h"
 
 class MyOctreeLocator : public vtkOctreePointLocator
@@ -53,7 +53,7 @@ class MyOctreeLocator : public vtkOctreePointLocator
     void operator =(const MyOctreeLocator&);
 };
 
-class PointsFunctor : public vtkFunctor
+class PointsFunctor : public vtkRangeFunctor
 {
 protected:
   PointsFunctor()
@@ -93,13 +93,17 @@ public:
     this->locator = locator;
     }
 
-  virtual void operator()( vtkIdType i, vtkLocalData* data) const
+  virtual void operator()( vtkRange* r ) const
     {
     double pt[3];
-    vtkIdType id = locator->GetSortedPoints( i, pt );
-    newPointsLayout->SetPoint( i, pt );
-    oldToNew->SetId( id, i );
-    newPd->SetTuple( i, id, oldPd );
+    vtkRange1D* range = vtkRange1D::SafeDownCast(r);
+    for (vtkIdType i = range->Begin(); i < range->End(); ++i)
+      {
+      vtkIdType id = locator->GetSortedPoints( i, pt );
+      newPointsLayout->SetPoint( i, pt );
+      oldToNew->SetId( id, i );
+      newPd->SetTuple( i, id, oldPd );
+      }
     }
 
   vtkPoints* GetNewPoints()

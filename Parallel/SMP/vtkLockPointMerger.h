@@ -4,22 +4,23 @@
 //extra synchonization locks for case when you lack allocators per CPU
 
 #include "vtkParallelSMPModule.h" // For export macro
-#include "vtkFunctor.h"
+#include "vtkRangeFunctor.h"
+#include "vtkRange1D.h"
 
 class vtkPoints;
 class vtkPointData;
 class vtkDummyMergeFunctor;
 
-struct VTKPARALLELSMP_EXPORT vtkLockPointMerger : public vtkFunctor
+struct VTKPARALLELSMP_EXPORT vtkLockPointMerger : public vtkRangeFunctor
 {
   vtkDummyMergeFunctor* Functor;
   vtkIdType NumberOfPointsFirstThread;
 
-  vtkTypeMacro(vtkLockPointMerger,vtkFunctor);
+  vtkTypeMacro(vtkLockPointMerger,vtkRangeFunctor);
   static vtkLockPointMerger* New();
   void PrintSelf(ostream &os, vtkIndent indent);
 
-  void operator()( vtkIdType id, vtkLocalData* data ) const;
+  void operator()(vtkRange*) const;
 
 protected:
   vtkLockPointMerger() {}

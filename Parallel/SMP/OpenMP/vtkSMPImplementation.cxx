@@ -1,16 +1,19 @@
 #include "vtkParallelOperators.h"
-#include "vtkFunctor.h"
-#include "vtkFunctorInitializable.h"
+#include "vtkTreeFunctor.h"
+#include "vtkTreeFunctorInitializable.h"
+#include "vtkRangeFunctor.h"
+#include "vtkRangeFunctorInitializable.h"
+#include "vtkRange1D.h"
 #include "vtkParallelTree.h"
 #include "vtkTask.h"
 #include "vtkMergeDataSets.h"
 
 #include <omp.h>
 
-void omp_traversal( vtkIdType index, int lvl, vtkIdType BranchingFactor, const vtkParallelTree* Tree, vtkFunctor* func )
+void omp_traversal( vtkIdType index, int lvl, vtkIdType BranchingFactor, const vtkParallelTree* Tree, vtkTreeFunctor* func )
 {
   int tid = omp_get_thread_num();
-  vtkFunctorInitializable* f = vtkFunctorInitializable::SafeDownCast(func);
+  vtkTreeFunctorInitializable* f = vtkTreeFunctorInitializable::SafeDownCast(func);
   if ( f && f->ShouldInitialize(tid) ) f->Init(tid);
   vtkLocalData* data = func->getLocal(tid);
   int cont = Tree->TraverseNode(index, lvl, func, data);
@@ -42,32 +45,39 @@ int vtkSMPInternalGetNumberOfThreads()
   return numThreads;
 }
 
-void vtkParallelOperators::ForEach(vtkIdType first, vtkIdType last, const vtkFunctor* op, int grain)
+void vtkParallelOperators::ForEach(vtkIdType first, vtkIdType last, const vtkRangeFunctor* op, int grain)
 {
 #pragma omp default(none)
 #pragma omp parallel
   {
-  vtkLocalData* data = op->getLocal(omp_get_thread_num());
-#pragma omp for
-  for ( vtkIdType i = first ; i < last ; ++i )
-    (*op)( i, data );
-  data->Delete();
+  vtkIdType chunkSize = (last - first) / omp_get_num_threads() + 1;
+  int tid = omp_get_thread_num();
+  vtkIdType f = first + chunkSize * tid;
+  vtkIdType l = first + chunkSize * (tid + 1);
+  if (l>last) l = last;
+  vtkRange1D* range = vtkRange1D::New();
+  range->Setup(f,l,tid);
+  (*op)( range );
+  range->Delete();
   }
 }
 
-void vtkParallelOperators::ForEach(vtkIdType first, vtkIdType last, const vtkFunctorInitializable* op, int grain)
+void vtkParallelOperators::ForEach(vtkIdType first, vtkIdType last, const vtkRangeFunctorInitializable* op, int grain)
 {
 #pragma omp default(none)
 #pragma omp parallel
   {
+  vtkIdType chunkSize = (last - first) / omp_get_num_threads() + 1;
   int tid = omp_get_thread_num();
   if ( op->ShouldInitialize(tid) )
     op->Init(tid);
-  vtkLocalData* data = op->getLocal(tid);
-#pragma omp for
-  for ( vtkIdType i = first ; i < last ; ++i )
-    (*op)( i, data );
-  data->Delete();
+  vtkIdType f = first + chunkSize * tid;
+  vtkIdType l = first + chunkSize * (tid + 1);
+  if (l>last) l = last;
+  vtkRange1D* range = vtkRange1D::New();
+  range->Setup(f,l,tid);
+  (*op)( range );
+  range->Delete();
   }
 }
 
@@ -123,7 +133,7 @@ void vtkMergeDataSets::Parallel(
   }
 }
 
-void vtkParallelOperators::Traverse( const vtkParallelTree* Tree, vtkFunctor* func )
+void vtkParallelOperators::Traverse( const vtkParallelTree* Tree, vtkTreeFunctor* func )
 {
   int lvl;
   vtkIdType bf;
@@ -137,7 +147,12 @@ void vtkParallelOperators::Traverse( const vtkParallelTree* Tree, vtkFunctor* fu
   }
 }
 
-void vtkFunctor::ComputeMasterTID()
+void vtkRangeFunctor::ComputeMasterTID()
+  {
+  this->MasterThreadId = omp_get_thread_num();
+  }
+
+void vtkTreeFunctor::ComputeMasterTID()
   {
   this->MasterThreadId = omp_get_thread_num();
   }

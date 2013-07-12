@@ -1,7 +1,8 @@
 #include "vtkSMPClipDataSet.h"
 #include "vtkParallelOperators.h"
-#include "vtkFunctor.h"
-#include "vtkFunctorInitializable.h"
+#include "vtkRangeFunctor.h"
+#include "vtkRangeFunctorInitializable.h"
+#include "vtkRange1D.h"
 #include "vtkMergeDataSets.h"
 #include "vtkThreadLocal.h"
 
@@ -31,61 +32,7 @@
 
 #include <math.h>
 
-class vtkClipDataSetLocalData : public vtkLocalData
-  {
-    vtkClipDataSetLocalData(const vtkClipDataSetLocalData&);
-    void operator=(const vtkClipDataSetLocalData&);
-  protected:
-    vtkClipDataSetLocalData() :
-        cell(0), cellScalars(0), outPD(0), locator(0)
-      {
-      conn[0] = conn[1] = 0;
-      outCD[0] = outCD[1] = 0;
-      types[0] = types[1] = 0;
-      locs[0] = locs[1] = 0;
-      }
-    ~vtkClipDataSetLocalData(){}
-  public:
-    vtkTypeMacro(vtkClipDataSetLocalData,vtkLocalData);
-    static vtkClipDataSetLocalData* New();
-    void PrintSelf(ostream& os, vtkIndent indent)
-      {
-      this->Superclass::PrintSelf(os,indent);
-      os << indent << "Locator: (" << locator << ")" << endl;
-      if (locator) locator->PrintSelf(os, indent.GetNextIndent());
-      os << indent << "Cell: (" << cell << ")" << endl;
-      if (cell) cell->PrintSelf(os, indent.GetNextIndent());
-      os << indent << "CellScalars: (" << cellScalars << ")" << endl;
-      if (cellScalars) cellScalars->PrintSelf(os, indent.GetNextIndent());
-      os << indent << "OutPD: (" << outPD << ")" << endl;
-      if (outPD) outPD->PrintSelf(os, indent.GetNextIndent());
-      os << indent << "OutCDs: (" << outCD << ")" << endl;
-      if (outCD[0]) outCD[0]->PrintSelf(os, indent.GetNextIndent());
-      if (outCD[1]) outCD[1]->PrintSelf(os, indent.GetNextIndent());
-      os << indent << "Conns: (" << conn << ")" << endl;
-      if (conn[0]) conn[0]->PrintSelf(os, indent.GetNextIndent());
-      if (conn[1]) conn[1]->PrintSelf(os, indent.GetNextIndent());
-      os << indent << "Types: (" << types << ")" << endl;
-      if (types[0]) types[0]->PrintSelf(os, indent.GetNextIndent());
-      if (types[1]) types[1]->PrintSelf(os, indent.GetNextIndent());
-      os << indent << "Locs: (" << locs << ")" << endl;
-      if (locs[0]) locs[0]->PrintSelf(os, indent.GetNextIndent());
-      if (locs[1]) locs[1]->PrintSelf(os, indent.GetNextIndent());
-      }
-
-    vtkGenericCell* cell;
-    vtkFloatArray* cellScalars;
-    vtkPointData* outPD;
-    vtkIncrementalPointLocator* locator;
-    vtkCellArray* conn[2];
-    vtkCellData* outCD[2];
-    vtkUnsignedCharArray* types[2];
-    vtkIdTypeArray* locs[2];
-  };
-
-vtkStandardNewMacro(vtkClipDataSetLocalData);
-
-class GenerateClipValueExecutor : public vtkFunctor
+class GenerateClipValueExecutor : public vtkRangeFunctor
 {
   GenerateClipValueExecutor(const GenerateClipValueExecutor&);
   void operator =(const GenerateClipValueExecutor&);
@@ -99,7 +46,7 @@ protected:
   vtkImplicitFunction* clipFunction;
 
 public:
-  vtkTypeMacro(GenerateClipValueExecutor,vtkFunctor);
+  vtkTypeMacro(GenerateClipValueExecutor,vtkRangeFunctor);
   static GenerateClipValueExecutor* New();
   void PrintSelf(ostream &os, vtkIndent indent)
     {
@@ -113,16 +60,20 @@ public:
     clipFunction = f;
     }
 
-  void operator()(vtkIdType i, vtkLocalData* data) const
+  void operator()(vtkRange* r) const
     {
+    vtkRange1D* range = vtkRange1D::SafeDownCast(r);
     double p[3];
-    this->input->GetPoint(i,p);
-    double s = this->clipFunction->FunctionValue(p);
-    this->scalars->SetTuple1(i,s);
+    for (vtkIdType i = range->Begin(); i < range->End(); ++i)
+      {
+      this->input->GetPoint(i,p);
+      double s = this->clipFunction->FunctionValue(p);
+      this->scalars->SetTuple1(i,s);
+      }
     }
 };
 
-class DoClip : public vtkFunctorInitializable
+class DoClip : public vtkRangeFunctorInitializable
 {
   DoClip(const DoClip&);
   void operator =(const DoClip&);
@@ -180,7 +131,7 @@ public:
   vtkThreadLocal<vtkUnsignedCharArray>* types[2];
   vtkThreadLocal<vtkIdTypeArray>* locs[2];
 
-  vtkTypeMacro(DoClip,vtkFunctorInitializable);
+  vtkTypeMacro(DoClip,vtkRangeFunctorInitializable);
   static DoClip* New();
   void PrintSelf(ostream &os, vtkIndent indent)
     {
@@ -236,102 +187,102 @@ public:
     Initialized(tid);
     }
 
-  vtkLocalData* getLocal(int tid) const
+  void operator()(vtkRange* r) const
     {
-    vtkClipDataSetLocalData* data =
-      vtkClipDataSetLocalData::New();
-    data->cell = this->cell->GetLocal(tid);
-    data->cellScalars = this->cellScalars->GetLocal(tid);
-    data->outPD = this->outPD->GetLocal(tid);
-    data->locator = this->locator->GetLocal(tid);
-    for (int i = 0; i < numOutputs; ++i)
-      {
-      data->conn[i] = this->conn[i]->GetLocal(tid);
-      data->outCD[i] = this->outCD[i]->GetLocal(tid);
-      data->types[i] = this->types[i]->GetLocal(tid);
-      data->locs[i] = this->locs[i]->GetLocal(tid);
-      }
-    return data;
-    }
-
-  void operator()(vtkIdType cellId, vtkLocalData* d) const
-    {
-    vtkClipDataSetLocalData* data =
-      static_cast<vtkClipDataSetLocalData*>(d);
-    vtkGenericCell* cell = data->cell;
-    input->GetCell(cellId,cell);
-    vtkPoints* cellPts = cell->GetPoints();
-    vtkIdList* cellIds = cell->GetPointIds();
-    vtkIdType npts = cellPts->GetNumberOfPoints();
-
-    // evaluate implicit cutting function
-    for (int i=0; i < npts; i++ )
-      {
-      double s = clipScalars->GetComponent(cellIds->GetId(i), 0);
-      data->cellScalars->InsertTuple(i, &s);
-      }
-
-    // perform the clipping
-    int num[2];
-    num[0] = data->conn[0]->GetNumberOfCells();
-    cell->Clip(value, data->cellScalars, data->locator,
-        data->conn[0], inPD, data->outPD, inCD, cellId,
-        data->outCD[0], this->insideOut);
-    num[0] = data->conn[0]->GetNumberOfCells() - num[0];
-
+    vtkRange1D* range = vtkRange1D::SafeDownCast(r);
+    int tid = range->GetTid();
+    vtkGenericCell* cell = this->cell->GetLocal(tid);
+    vtkFloatArray* cellScalars = this->cellScalars->GetLocal(tid);
+    vtkPointData* outPD = this->outPD->GetLocal(tid);
+    vtkIncrementalPointLocator* locator = this->locator->GetLocal(tid);
+    vtkCellArray* conn[2] = {this->conn[0]->GetLocal(tid),0};
+    vtkCellData* outCD[2] = {this->outCD[0]->GetLocal(tid),0};
+    vtkUnsignedCharArray* types[2] = {this->types[0]->GetLocal(tid),0};
+    vtkIdTypeArray* locs[2] = {this->locs[0]->GetLocal(tid),0};
     if ( numOutputs > 1 )
       {
-      num[1] = data->conn[1]->GetNumberOfCells();
-      cell->Clip(value, data->cellScalars, data->locator,
-          data->conn[1], inPD, data->outPD, inCD, cellId,
-          data->outCD[1], this->insideOut);
-      num[1] = data->conn[1]->GetNumberOfCells() - num[0];
+      conn[1] = this->conn[1]->GetLocal(tid);
+      outCD[1] = this->outCD[1]->GetLocal(tid);
+      types[1] = this->types[1]->GetLocal(tid);
+      locs[1] = this->locs[1]->GetLocal(tid);
       }
-
-    for (int i=0; i<numOutputs; i++) //for both outputs
+    
+    for (vtkIdType cellId = range->Begin(); cellId < range->End(); ++cellId)
       {
-      for (int j=0; j < num[i]; j++)
+      input->GetCell(cellId,cell);
+      vtkPoints* cellPts = cell->GetPoints();
+      vtkIdList* cellIds = cell->GetPointIds();
+      vtkIdType npts = cellPts->GetNumberOfPoints();
+
+      // evaluate implicit cutting function
+      for (int i=0; i < npts; i++ )
         {
-        if (cell->GetCellType() == VTK_POLYHEDRON)
-          {
-          //Polyhedron cells have a special cell connectivity format
-          //(nCell0Faces, nFace0Pts, i, j, k, nFace1Pts, i, j, k, ...).
-          //But we don't need to deal with it here. The special case is handled
-          //by vtkUnstructuredGrid::SetCells(), which will be called next.
-          data->types[i]->InsertNextValue(VTK_POLYHEDRON);
-          }
-        else
-          {
-          data->locs[i]->InsertNextValue(data->conn[i]->GetTraversalLocation());
-          vtkIdType* pts;
-          data->conn[i]->GetNextCell(npts,pts);
+        double s = clipScalars->GetComponent(cellIds->GetId(i), 0);
+        cellScalars->InsertTuple(i, &s);
+        }
 
-          int cellType = 0;
-          //For each new cell added, got to set the type of the cell
-          switch ( cell->GetCellDimension() )
+      // perform the clipping
+      int num[2];
+      num[0] = conn[0]->GetNumberOfCells();
+      cell->Clip(value, cellScalars, locator,
+          conn[0], inPD, outPD, inCD, cellId,
+          outCD[0], this->insideOut);
+      num[0] = conn[0]->GetNumberOfCells() - num[0];
+
+      if ( numOutputs > 1 )
+        {
+        num[1] = conn[1]->GetNumberOfCells();
+        cell->Clip(value, cellScalars, locator,
+            conn[1], inPD, outPD, inCD, cellId,
+            outCD[1], this->insideOut);
+        num[1] = conn[1]->GetNumberOfCells() - num[0];
+        }
+
+      for (int i=0; i<numOutputs; i++) //for both outputs
+        {
+        for (int j=0; j < num[i]; j++)
+          {
+          if (cell->GetCellType() == VTK_POLYHEDRON)
             {
-            case 0: //points are generated--------------------------------
-              cellType = (npts > 1 ? VTK_POLY_VERTEX : VTK_VERTEX);
-              break;
+            //Polyhedron cells have a special cell connectivity format
+            //(nCell0Faces, nFace0Pts, i, j, k, nFace1Pts, i, j, k, ...).
+            //But we don't need to deal with it here. The special case is handled
+            //by vtkUnstructuredGrid::SetCells(), which will be called next.
+            types[i]->InsertNextValue(VTK_POLYHEDRON);
+            }
+          else
+            {
+            locs[i]->InsertNextValue(conn[i]->GetTraversalLocation());
+            vtkIdType* pts;
+            conn[i]->GetNextCell(npts,pts);
 
-            case 1: //lines are generated---------------------------------
-              cellType = (npts > 2 ? VTK_POLY_LINE : VTK_LINE);
-              break;
+            int cellType = 0;
+            //For each new cell added, got to set the type of the cell
+            switch ( cell->GetCellDimension() )
+              {
+              case 0: //points are generated--------------------------------
+                cellType = (npts > 1 ? VTK_POLY_VERTEX : VTK_VERTEX);
+                break;
 
-            case 2: //polygons are generated------------------------------
-              cellType = (npts == 3 ? VTK_TRIANGLE :
-                                      (npts == 4 ? VTK_QUAD : VTK_POLYGON));
-              break;
+              case 1: //lines are generated---------------------------------
+                cellType = (npts > 2 ? VTK_POLY_LINE : VTK_LINE);
+                break;
 
-            case 3: //tetrahedra or wedges are generated------------------
-              cellType = (npts == 4 ? VTK_TETRA : VTK_WEDGE);
-              break;
-            } //switch
+              case 2: //polygons are generated------------------------------
+                cellType = (npts == 3 ? VTK_TRIANGLE :
+                                        (npts == 4 ? VTK_QUAD : VTK_POLYGON));
+                break;
 
-          data->types[i]->InsertNextValue(cellType);
-          }
-        } //for each new cell
-      } //for both outputs
+              case 3: //tetrahedra or wedges are generated------------------
+                cellType = (npts == 4 ? VTK_TETRA : VTK_WEDGE);
+                break;
+              } //switch
+
+            types[i]->InsertNextValue(cellType);
+            }
+          } //for each new cell
+        } //for both outputs
+      }
     }
 };
 

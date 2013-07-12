@@ -31,8 +31,12 @@ set(SMP_Internals
 set(SMP_Core
   vtkParallelTree.cxx #required by TraverseOp
   vtkLocalData.cxx
-  vtkFunctor.cxx #requirement of ForEachOp
-  vtkFunctorInitializable.cxx
+  vtkTreeFunctor.cxx #requirement of ForEachOp
+  vtkTreeFunctorInitializable.cxx
+  vtkRangeFunctor.cxx
+  vtkRangeFunctorInitializable.cxx
+  vtkRange.cxx
+  vtkRange1D.cxx
   vtkParallelOperators.cxx
   vtkMergeDataSets.cxx
   vtkThreadLocal.cxx
@@ -44,14 +48,14 @@ set(SMP_Core
 
 #end user SMP accelerated vtk facilities (mostly filters)
 set(SMP_Filters
-  vtkSMPContourFilter.cxx
   vtkSMPMergePoints.cxx
   vtkSMPMinMaxTree.cxx
   vtkSMPTransform.cxx
   vtkSMPWarpVector.cxx
   vtkSMPZCurve.cxx
   vtkSMPClipDataSet.cxx
-  vtkSMP2ContourFilter.cxx
+  vtkSMPContourFilter.cxx
+  #  vtkSMP2ContourFilter.cxx
 )
 
 set(Module_SRCS

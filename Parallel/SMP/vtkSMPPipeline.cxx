@@ -1,6 +1,7 @@
 #include "vtkSMPPipeline.h"
 #include "vtkParallelOperators.h"
-#include "vtkFunctorInitializable.h"
+#include "vtkRangeFunctorInitializable.h"
+#include "vtkRange1D.h"
 #include "vtkThreadLocal.h"
 
 #include "vtkAlgorithm.h"
@@ -17,38 +18,7 @@
 
 vtkInformationKeyMacro(vtkSMPPipeline, DATA_OBJECT_CONCRETE_TYPE, String);
 
-class vtkSMPPipelineLocalData : public vtkLocalData
-  {
-    vtkSMPPipelineLocalData(const vtkSMPPipelineLocalData&);
-    void operator=(const vtkSMPPipelineLocalData&);
-  protected:
-    vtkSMPPipelineLocalData() : inLocalInfo(0), outLocalInfo(0), requests(0) {}
-    ~vtkSMPPipelineLocalData()
-      {
-      if (inLocalInfo) delete [] inLocalInfo;
-      }
-  public:
-    vtkTypeMacro(vtkSMPPipelineLocalData,vtkLocalData);
-    static vtkSMPPipelineLocalData* New();
-    void PrintSelf(ostream& os, vtkIndent indent)
-      {
-      this->Superclass::PrintSelf(os,indent);
-      os << indent << "InLocalInfo: (" << inLocalInfo << ")" << endl;
-      if (inLocalInfo) inLocalInfo[0]->PrintSelf(os,indent.GetNextIndent());
-      os << indent << "OutLocalInfo: (" << outLocalInfo << ")" << endl;
-      if (outLocalInfo) outLocalInfo->PrintSelf(os,indent.GetNextIndent());
-      os << indent << "Requests: (" << requests << ")" << endl;
-      if (requests) requests->PrintSelf(os,indent.GetNextIndent());
-      }
-
-    vtkInformationVector** inLocalInfo;
-    vtkInformationVector* outLocalInfo;
-    vtkInformation* requests;
-  };
-
-vtkStandardNewMacro(vtkSMPPipelineLocalData);
-
-class ParallelFilterExecutor : public vtkFunctorInitializable
+class ParallelFilterExecutor : public vtkRangeFunctorInitializable
 {
     ParallelFilterExecutor(const ParallelFilterExecutor&);
     void operator =(const ParallelFilterExecutor&);
@@ -84,7 +54,7 @@ class ParallelFilterExecutor : public vtkFunctorInitializable
     vtkSMPPipeline* Executive;
 
   public:
-    vtkTypeMacro(ParallelFilterExecutor, vtkFunctorInitializable);
+    vtkTypeMacro(ParallelFilterExecutor, vtkRangeFunctorInitializable);
     static ParallelFilterExecutor* New();
     void PrintSelf(ostream &os, vtkIndent indent)
       {
@@ -105,47 +75,48 @@ class ParallelFilterExecutor : public vtkFunctorInitializable
       this->Initialized(tid);
       }
 
-    vtkLocalData* getLocal(int tid) const
+    void operator()( vtkRange* r ) const
       {
-      vtkSMPPipelineLocalData* data = vtkSMPPipelineLocalData::New();
+      vtkRange1D* range = vtkRange1D::SafeDownCast(r);
+      int tid = range->GetTid();
+
       vtkIdType numPorts = this->Executive->GetNumberOfInputPorts();
-      data->inLocalInfo = new vtkInformationVector*[numPorts];
+      vtkInformationVector** inLocalInfo = new vtkInformationVector*[numPorts];
       for (vtkIdType i = 0; i < numPorts; ++i)
         {
-        data->inLocalInfo[i] = this->inLocalInfo[i]->GetLocal(tid);
+        inLocalInfo[i] = this->inLocalInfo[i]->GetLocal(tid);
         }
-      data->outLocalInfo = this->outLocalInfo->GetLocal(tid);
-      data->requests = this->requests->GetLocal(tid);
-      return data;
-      }
-
-    void operator()(vtkIdType id, vtkLocalData* d) const
-      {
-      vtkSMPPipelineLocalData* data =
-        static_cast<vtkSMPPipelineLocalData*>(d);
-      vtkDataObject* dobj = this->inObjs[id];
-      if (dobj)
+      vtkInformationVector* outLocalInfo = this->outLocalInfo->GetLocal(tid);
+      vtkInformation* requests = this->requests->GetLocal(tid);
+      
+      for (vtkIdType id = range->Begin(); id < range->End(); ++id)
         {
-        vtkInformation* r = data->requests;
-        vtkInformation* inInfo = data->inLocalInfo[this->compositePort]->GetInformationObject(0);
-        vtkInformation* outInfo = data->outLocalInfo->GetInformationObject(0);
+        vtkDataObject* dobj = this->inObjs[id];
+        if (dobj)
+          {
+          vtkInformation* r = requests;
+          vtkInformation* inInfo = inLocalInfo[this->compositePort]->GetInformationObject(0);
+          vtkInformation* outInfo = outLocalInfo->GetInformationObject(0);
 
-        // Note that since VisitOnlyLeaves is ON on the iterator,
-        // this method is called only for leaves, hence, we are assured that
-        // neither dobj nor outObj are vtkCompositeDataSet subclasses.
-        this->outObjs[id] =
-            this->Executive->ExecuteSimpleAlgorithmForBlock(
-                                                 data->inLocalInfo,
-                                                 data->outLocalInfo,
-                                                 inInfo,
-                                                 outInfo,
-                                                 r,
-                                                 dobj);
+          // Note that since VisitOnlyLeaves is ON on the iterator,
+          // this method is called only for leaves, hence, we are assured that
+          // neither dobj nor outObj are vtkCompositeDataSet subclasses.
+          this->outObjs[id] =
+              this->Executive->ExecuteSimpleAlgorithmForBlock(
+                                                   inLocalInfo,
+                                                   outLocalInfo,
+                                                   inInfo,
+                                                   outInfo,
+                                                   r,
+                                                   dobj);
+          }
+        else
+          {
+          this->outObjs[id] = 0;
+          }
         }
-      else
-        {
-        this->outObjs[id] = 0;
-        }
+
+      delete [] inLocalInfo;
       }
 
     void PrepareData(vtkCompositeDataIterator* iter, vtkInformationVector** _inInfoVec,

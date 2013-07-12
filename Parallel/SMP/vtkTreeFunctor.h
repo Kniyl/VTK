@@ -1,24 +1,24 @@
-#ifndef __vtkFunctor_h__
-#define __vtkFunctor_h__
+#ifndef __vtkTreeFunctor_h__
+#define __vtkTreeFunctor_h__
 
 #include "vtkParallelSMPModule.h" // For export macro
 #include "vtkLocalData.h"
 
-class VTKPARALLELSMP_EXPORT vtkFunctor : public vtkObject
+class VTKPARALLELSMP_EXPORT vtkTreeFunctor : public vtkObject
 {
-  vtkFunctor(const vtkFunctor&);  // Not implemented.
-  void operator=(const vtkFunctor&);  // Not implemented.
+  vtkTreeFunctor(const vtkTreeFunctor&);  // Not implemented.
+  void operator=(const vtkTreeFunctor&);  // Not implemented.
 
   void ComputeMasterTID();
 
 protected:
-  vtkFunctor();
-  ~vtkFunctor();
+  vtkTreeFunctor();
+  ~vtkTreeFunctor();
 
   int MasterThreadId;
 
 public:
-  vtkTypeMacro(vtkFunctor,vtkObject);
+  vtkTypeMacro(vtkTreeFunctor,vtkObject);
   void PrintSelf(ostream& os, vtkIndent indent);
 
   virtual void operator()(vtkIdType, vtkLocalData*) const = 0;

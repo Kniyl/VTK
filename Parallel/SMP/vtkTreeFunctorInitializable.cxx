@@ -1,35 +1,35 @@
-#include "vtkFunctorInitializable.h"
+#include "vtkTreeFunctorInitializable.h"
 
 extern int vtkSMPInternalGetNumberOfThreads();
 extern int vtkSMPInternalGetTid();
 
 //======================================================================================
-vtkFunctorInitializable::vtkFunctorInitializable() :
-    vtkFunctor(),
+vtkTreeFunctorInitializable::vtkTreeFunctorInitializable() :
+    vtkTreeFunctor(),
     IsInitialized(vtkSMPInternalGetNumberOfThreads(), 0)
   {
   }
 
 //--------------------------------------------------------------------------------
-vtkFunctorInitializable::~vtkFunctorInitializable()
+vtkTreeFunctorInitializable::~vtkTreeFunctorInitializable()
   {
   IsInitialized.clear();
   }
 
 //--------------------------------------------------------------------------------
-bool vtkFunctorInitializable::ShouldInitialize(int tid) const
+bool vtkTreeFunctorInitializable::ShouldInitialize(int tid) const
   {
   return !IsInitialized[tid];
   }
 
 //--------------------------------------------------------------------------------
-void vtkFunctorInitializable::Initialized(int tid) const
+void vtkTreeFunctorInitializable::Initialized(int tid) const
   {
   IsInitialized[tid] = 1;
   }
 
 //--------------------------------------------------------------------------------
-void vtkFunctorInitializable::PrintSelf(ostream &os, vtkIndent indent)
+void vtkTreeFunctorInitializable::PrintSelf(ostream &os, vtkIndent indent)
   {
   this->Superclass::PrintSelf( os, indent );
   os << indent << "Is initialized: " << endl;

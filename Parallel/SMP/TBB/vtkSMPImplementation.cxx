@@ -1,7 +1,10 @@
 #include "vtkSMPImplementation.h"
 #include "vtkParallelOperators.h"
-#include "vtkFunctor.h"
-#include "vtkFunctorInitializable.h"
+#include "vtkTreeFunctor.h"
+#include "vtkTreeFunctorInitializable.h"
+#include "vtkRangeFunctor.h"
+#include "vtkRangeFunctorInitializable.h"
+#include "vtkRange1D.h"
 #include "vtkParallelTree.h"
 #include "vtkTask.h"
 #include "vtkMergeDataSets.h"
@@ -29,26 +32,24 @@ const TBBInit performInit;
 
 class FuncCall
 {
-  const vtkFunctor* o;
+  const vtkRangeFunctor* o;
 
 public:
   void operator() ( const tbb::blocked_range<vtkIdType>& r ) const
     {
-    vtkLocalData* data = o->getLocal(performInit.getTID());
-    for ( vtkIdType k = r.begin(); k < r.end(); ++k )
-      {
-      (*o)( k, data );
-      }
-    data->Delete();
+    vtkRange1D* range = vtkRange1D::New();
+    range->Setup(r.begin(),r.end(),performInit.getTID());
+    (*o)( range );
+    range->Delete();
     }
 
-  FuncCall ( const vtkFunctor* _o ) : o(_o) { }
+  FuncCall ( const vtkRangeFunctor* _o ) : o(_o) { }
   ~FuncCall () { }
 };
 
 class FuncCallInit
 {
-  const vtkFunctorInitializable* o;
+  const vtkRangeFunctorInitializable* o;
 
 public:
   void operator() ( const tbb::blocked_range<vtkIdType>& r ) const
@@ -58,15 +59,13 @@ public:
       {
       o->Init(tid);
       }
-    vtkLocalData* data = o->getLocal(tid);
-    for ( vtkIdType k = r.begin(); k < r.end(); ++k )
-      {
-      (*o)( k, data );
-      }
-    data->Delete();
+    vtkRange1D* range = vtkRange1D::New();
+    range->Setup(r.begin(),r.end(),tid);
+    (*o)( range );
+    range->Delete();
     }
 
-  FuncCallInit ( const vtkFunctorInitializable* _o ) : o(_o) { }
+  FuncCallInit ( const vtkRangeFunctorInitializable* _o ) : o(_o) { }
   ~FuncCallInit () { }
 };
 
@@ -115,13 +114,13 @@ class TaskParallel2 : public tbb::task {
 
 class TaskTraverse : public tbb::task {
     const vtkParallelTree* Tree;
-    vtkFunctor* Functor;
+    vtkTreeFunctor* Functor;
     const int level;
     const vtkIdType index, BranchingFactor;
     vtkLocalData* data;
   public:
     TaskTraverse(
-        const vtkParallelTree* t, vtkFunctor* f,
+        const vtkParallelTree* t, vtkTreeFunctor* f,
         int l, vtkIdType i, vtkIdType b,
         vtkLocalData* d )
           : Tree(t), Functor(f),
@@ -158,8 +157,8 @@ class TaskTraverse : public tbb::task {
     virtual void note_affinity ( tbb::task::affinity_id id )
       {
       int tid = id - 1;
-      vtkFunctorInitializable* f =
-        vtkFunctorInitializable::SafeDownCast(Functor);
+      vtkTreeFunctorInitializable* f =
+        vtkTreeFunctorInitializable::SafeDownCast(Functor);
       if ( f && f->ShouldInitialize(tid) ) f->Init(tid);
       data->UnRegister(0);
       data = Functor->getLocal(tid);
@@ -180,7 +179,7 @@ int vtkSMPInternalGetTid()
   return performInit.getTID();
 }
 
-void vtkParallelOperators::ForEach ( vtkIdType first, vtkIdType last, const vtkFunctor* op, int grain )
+void vtkParallelOperators::ForEach ( vtkIdType first, vtkIdType last, const vtkRangeFunctor* op, int grain )
 {
   vtkIdType n = last - first;
   if (!n) return;
@@ -188,7 +187,7 @@ void vtkParallelOperators::ForEach ( vtkIdType first, vtkIdType last, const vtkF
   tbb::parallel_for( tbb::blocked_range<vtkIdType>( first, last, g ), FuncCall( op ) );
 }
 
-void vtkParallelOperators::ForEach ( vtkIdType first, vtkIdType last, const vtkFunctorInitializable* op, int grain )
+void vtkParallelOperators::ForEach ( vtkIdType first, vtkIdType last, const vtkRangeFunctorInitializable* op, int grain )
 {
   vtkIdType n = last - first;
   if (!n) return;
@@ -247,9 +246,8 @@ void vtkMergeDataSets::Parallel(
   tbb::task::spawn_root_and_wait(list);
   }
 
-/* */
-void vtkParallelOperators::Traverse(const vtkParallelTree *Tree, vtkFunctor *func)
-{
+void vtkParallelOperators::Traverse(const vtkParallelTree *Tree, vtkTreeFunctor *func)
+  {
   int level;
   vtkIdType bf;
   Tree->GetTreeSize(level, bf);
@@ -258,129 +256,14 @@ void vtkParallelOperators::Traverse(const vtkParallelTree *Tree, vtkFunctor *fun
     TaskTraverse(Tree, func, 0, 0, bf, data);
   data->Delete();
   tbb::task::spawn_root_and_wait(*t);
-}
-/*/
-
-struct ParallelTreeRange
-{
-  int root_level, cur_level, max;
-  vtkIdType begin, end, *nodes_per_subtrees;
-
-  ParallelTreeRange(int m, vtkIdType e, vtkIdType* n)
-    : root_level(0), cur_level(0), max(m), begin(0), end(e),
-    nodes_per_subtrees(n) {}
-
-  bool empty() const {return begin == end; }
-  bool is_divisible() const
-  {
-    return begin + nodes_per_subtrees[1] < end;
   }
 
-  ParallelTreeRange(ParallelTreeRange& r, tbb::split)
+void vtkRangeFunctor::ComputeMasterTID()
   {
-    begin = end = r.end;
-    nodes_per_subtrees = r.nodes_per_subtrees;
-    int steal_lvl = root_level + 1;
-    while (r.cur_level >= steal_lvl && steal_lvl < r.max)
-    {
-      if (r.begin < r.end - r.nodes_per_subtrees[r.max - steal_lvl])
-      {
-        r.end = begin = end - r.nodes_per_subtrees[r.max-steal_lvl];
-        cur_level = root_level = steal_lvl;
-        max = r.max;
-        break;
-      }
-      else
-      {
-        ++steal_lvl;
-      }
-    }
+  this->MasterThreadId = performInit.getTID();
   }
-};
 
-vtkIdType convert_to_rowfirst(ParallelTreeRange& r, vtkIdType bf)
-{
-  if (!r.cur_level) return 0;
-  int lvl = 1;
-  vtkIdType index = 1;
-  vtkIdType i = r.begin;
-  while (lvl <= r.cur_level)
-  {
-    vtkIdType size = r.nodes_per_subtrees[r.max - lvl];
-    while (i>size)
-    {
-      i -= size;
-      ++index;
-    }
-    if (r.cur_level != lvl)
-      index = index * bf + 1;
-    ++lvl;
-    --i;
-  }
-  return index;
-}
-
-struct Body
-{
-  const vtkParallelTree* Tree;
-  vtkFunctor* func;
-  vtkIdType branching_factor;
-
-  Body(const vtkParallelTree* t, vtkFunctor* f, vtkIdType bf)
-    : Tree(t), func(f), branching_factor(bf) {}
-
-  void operator()(ParallelTreeRange& r) const
-  {
-    vtkIdType id = convert_to_rowfirst(r,branching_factor);
-    int tid = performInit.getTID();
-    vtkFunctorInitializable* init = vtkFunctorInitializable::SafeDownCast(func);
-    if(init && init->ShouldInitialize(tid)) init->Init(tid);
-    while(++r.begin<=r.end)
-    {
-      if (Tree->TraverseNode(id,r.cur_level,func,tid))
-      {
-        ++r.cur_level;
-        id *= branching_factor;
-      }
-      else
-      {
-        if (r.max != r.cur_level)
-        {
-          r.begin += r.nodes_per_subtrees[r.max-r.cur_level]-1;
-        }
-        while ( !(id%branching_factor) && r.cur_level > r.root_level )
-        {
-          --r.cur_level;
-          id = (id-1)/branching_factor;
-        }
-      }
-      ++id;
-    }
-  }
-};
-
-void vtkParallelOperators::Traverse(const vtkParallelTree *Tree, vtkFunctor *func)
-{
-  int max_level;
-  vtkIdType branching_factor;
-  Tree->GetTreeSize(max_level,branching_factor);
-  Body b(Tree, func, branching_factor);
-
-  vtkIdType *npst = new vtkIdType[max_level + 1];
-  vtkIdType value = npst[0] = 1;
-  for (int i = 1; i <= max_level; ++i)
-  {
-    value *= branching_factor;
-    npst[i] = ++value;
-  }
-  ParallelTreeRange r(max_level,value,npst);
-
-  tbb::parallel_for(r,b);
-  delete npst;
-}
-/* */
-
-void vtkFunctor::ComputeMasterTID()
+void vtkTreeFunctor::ComputeMasterTID()
   {
   this->MasterThreadId = performInit.getTID();
   }
