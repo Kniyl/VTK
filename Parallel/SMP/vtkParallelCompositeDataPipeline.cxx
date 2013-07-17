@@ -1,5 +1,5 @@
-#include "vtkSMPPipeline.h"
-#include "vtkSMPAlgorithm.h"
+#include "vtkParallelCompositeDataPipeline.h"
+#include "vtkSplittingAlgorithm.h"
 #include "vtkParallelOperators.h"
 #include "vtkRangeFunctorInitializable.h"
 #include "vtkRange1D.h"
@@ -17,7 +17,7 @@
 #include "vtkInformationIntegerKey.h"
 #include "vtkInformationExecutivePortKey.h"
 
-vtkInformationKeyMacro(vtkSMPPipeline, DATA_OBJECT_CONCRETE_TYPE, String);
+vtkInformationKeyMacro(vtkParallelCompositeDataPipeline, DATA_OBJECT_CONCRETE_TYPE, String);
 
 class ParallelFilterExecutor : public vtkRangeFunctorInitializable
 {
@@ -52,7 +52,7 @@ class ParallelFilterExecutor : public vtkRangeFunctorInitializable
     vtkThreadLocal<vtkInformation>* requests;
 
     int compositePort;
-    vtkSMPPipeline* Executive;
+    vtkParallelCompositeDataPipeline* Executive;
 
   public:
     vtkTypeMacro(ParallelFilterExecutor, vtkRangeFunctorInitializable);
@@ -122,7 +122,7 @@ class ParallelFilterExecutor : public vtkRangeFunctorInitializable
 
     void PrepareData(vtkCompositeDataIterator* iter, vtkInformationVector** _inInfoVec,
                      vtkInformationVector* _outInfoVec, vtkInformation* _request,
-                     vtkSMPPipeline* self, int _compositePort)
+                     vtkParallelCompositeDataPipeline* self, int _compositePort)
       {
       this->compositePort = _compositePort;
       this->Executive = self;
@@ -176,22 +176,22 @@ class ParallelFilterExecutor : public vtkRangeFunctorInitializable
 };
 
 vtkStandardNewMacro(ParallelFilterExecutor);
-vtkStandardNewMacro(vtkSMPPipeline);
+vtkStandardNewMacro(vtkParallelCompositeDataPipeline);
 
-vtkSMPPipeline::vtkSMPPipeline() : vtkCompositeDataPipeline()
+vtkParallelCompositeDataPipeline::vtkParallelCompositeDataPipeline() : vtkCompositeDataPipeline()
   {
   }
 
-vtkSMPPipeline::~vtkSMPPipeline()
+vtkParallelCompositeDataPipeline::~vtkParallelCompositeDataPipeline()
   {
   }
 
-void vtkSMPPipeline::PrintSelf(ostream &os, vtkIndent indent)
+void vtkParallelCompositeDataPipeline::PrintSelf(ostream &os, vtkIndent indent)
   {
   this->Superclass::PrintSelf(os,indent);
   }
 
-int vtkSMPPipeline::ExecuteData(vtkInformation *request, vtkInformationVector **inInfoVec, vtkInformationVector *outInfoVec)
+int vtkParallelCompositeDataPipeline::ExecuteData(vtkInformation *request, vtkInformationVector **inInfoVec, vtkInformationVector *outInfoVec)
   {
   vtkDebugMacro(<< "ExecuteData");
   int result = 1;
@@ -202,10 +202,10 @@ int vtkSMPPipeline::ExecuteData(vtkInformation *request, vtkInformationVector **
     {
     if (this->GetNumberOfOutputPorts())
       {
-      vtkSMPAlgorithm* algo = dynamic_cast<vtkSMPAlgorithm *>(this->Algorithm);
+      vtkSplittingAlgorithm* algo = dynamic_cast<vtkSplittingAlgorithm *>(this->Algorithm);
       if (algo && algo->GetSplitDataset())
         {
-        vtkDebugMacro(<< "vtkSMPAlgorithm will produce a composite data output from each input bloc")
+        vtkDebugMacro(<< "vtkSplittingAlgorithm will produce a composite data output from each input bloc")
         this->Superclass::ExecuteSimpleAlgorithm(request, inInfoVec, outInfoVec, compositePort);
         }
       else
@@ -224,7 +224,7 @@ int vtkSMPPipeline::ExecuteData(vtkInformation *request, vtkInformationVector **
   return result;
   }
 
-void vtkSMPPipeline::ExecuteSimpleAlgorithm(
+void vtkParallelCompositeDataPipeline::ExecuteSimpleAlgorithm(
     vtkInformation *request, vtkInformationVector **inInfoVec,
     vtkInformationVector *outInfoVec, int compositePort)
   {
@@ -332,7 +332,7 @@ void vtkSMPPipeline::ExecuteSimpleAlgorithm(
   this->ExecuteDataEnd(request,inInfoVec,outInfoVec);
   }
 
-int vtkSMPPipeline::CheckDataObject(int port, vtkInformationVector* outInfoVec)
+int vtkParallelCompositeDataPipeline::CheckDataObject(int port, vtkInformationVector* outInfoVec)
   {
   if (!this->Superclass::CheckDataObject(port, outInfoVec))
     {
@@ -342,14 +342,14 @@ int vtkSMPPipeline::CheckDataObject(int port, vtkInformationVector* outInfoVec)
   // SMP Algorithm declare some type for their output but
   // actually produce a multi pieces dataset. Each piece
   // being of that type.
-  vtkSMPAlgorithm* algo = dynamic_cast<vtkSMPAlgorithm*>(this->Algorithm);
+  vtkSplittingAlgorithm* algo = dynamic_cast<vtkSplittingAlgorithm*>(this->Algorithm);
   if (algo && algo->GetSplitDataset())
     {
     vtkInformation* outInfo = outInfoVec->GetInformationObject(port);
     // For now, only create a Multi Piece Dataset. Checks
     // will come later.
     vtkMultiPieceDataSet* data = vtkMultiPieceDataSet::New();
-    outInfo->Set(vtkSMPPipeline::DATA_OBJECT_CONCRETE_TYPE(),
+    outInfo->Set(vtkParallelCompositeDataPipeline::DATA_OBJECT_CONCRETE_TYPE(),
                   outInfo->Get(vtkDataObject::DATA_OBJECT())->GetClassName());
     this->SetOutputData(port, data, outInfo);
     }

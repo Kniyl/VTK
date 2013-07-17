@@ -3,9 +3,9 @@
 
 #include "vtkParallelSMPModule.h" // For export macro
 #include "vtkContourFilter.h"
-#include "vtkSMPAlgorithm.h"
+#include "vtkSplittingAlgorithm.h"
 
-class VTKPARALLELSMP_EXPORT vtkSMPContourFilter : public vtkContourFilter, public vtkSMPAlgorithm
+class VTKPARALLELSMP_EXPORT vtkSMPContourFilter : public vtkContourFilter, public vtkSplittingAlgorithm
 {
 public:
   vtkTypeMacro(vtkSMPContourFilter,vtkContourFilter);

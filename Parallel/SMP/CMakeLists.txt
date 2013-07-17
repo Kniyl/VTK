@@ -44,8 +44,8 @@ set(SMP_Core
 
 #end user SMP accelerated vtk facilities (mostly filters)
 set(SMP_Filters
-  vtkSMPPipeline.cxx
-  vtkSMPAlgorithm.cxx
+  vtkParallelCompositeDataPipeline.cxx
+  vtkSplittingAlgorithm.cxx
   vtkSMPMergePoints.cxx
   vtkSMPMinMaxTree.cxx
   vtkSMPTransform.cxx

@@ -12,7 +12,7 @@
 #include "vtkSMPMergePoints.h"
 #include "vtkSMPMinMaxTree.h"
 #include "vtkSMPTransform.h"
-#include "vtkSMPPipeline.h"
+#include "vtkParallelCompositeDataPipeline.h"
 #include "vtkTestUtilities.h"
 #include "vtkThreshold.h"
 #include "vtkTimerLog.h"
@@ -103,7 +103,7 @@ int TestSMPMesh( int argc, char * argv [] )
     return 1;
     }
 
-  vtkSMPPipeline* refExec = vtkSMPPipeline::New();
+  vtkParallelCompositeDataPipeline* refExec = vtkParallelCompositeDataPipeline::New();
   vtkAlgorithm::SetDefaultExecutivePrototype(refExec);
   refExec->Delete();
   
