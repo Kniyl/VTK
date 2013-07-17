@@ -40,14 +40,12 @@ set(SMP_Core
   vtkParallelOperators.cxx
   vtkMergeDataSets.cxx
   vtkThreadLocal.cxx
-  vtkSMPAlgorithm.cxx
-  vtkSMPPointSetAlgorithm.cxx
-  vtkSMPPolyDataAlgorithm.cxx
-  vtkSMPPipeline.cxx
 )
 
 #end user SMP accelerated vtk facilities (mostly filters)
 set(SMP_Filters
+  vtkSMPPipeline.cxx
+  vtkSMPAlgorithm.cxx
   vtkSMPMergePoints.cxx
   vtkSMPMinMaxTree.cxx
   vtkSMPTransform.cxx
@@ -55,7 +53,6 @@ set(SMP_Filters
   vtkSMPZCurve.cxx
   vtkSMPClipDataSet.cxx
   vtkSMPContourFilter.cxx
-  #  vtkSMP2ContourFilter.cxx
 )
 
 set(Module_SRCS
