@@ -624,7 +624,7 @@ int vtkSMPContourFilter::ProcessRequest(vtkInformation* request,
                                         vtkInformationVector** inVector,
                                         vtkInformationVector* outVector)
   {
-  if(!this->vtkSMPAlgorithm::ProcessRequest(
+  if(!this->vtkSplittingAlgorithm::ProcessRequest(
         request,inVector,outVector,this->GetNumberOfOutputPorts()))
     {
     return this->Superclass::ProcessRequest(request,inVector,outVector);

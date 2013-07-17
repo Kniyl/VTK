@@ -1,5 +1,5 @@
-#include "vtkSMPAlgorithm.h"
-#include "vtkSMPPipeline.h"
+#include "vtkSplittingAlgorithm.h"
+#include "vtkParallelCompositeDataPipeline.h"
 #include "vtkThreadLocal.h"
 
 #include "vtkInformation.h"
@@ -9,20 +9,20 @@
 
 
 //----------------------------------------------------------------------------
-vtkSMPAlgorithm::vtkSMPAlgorithm()
+vtkSplittingAlgorithm::vtkSplittingAlgorithm()
   {
   SplitDataset = 0;
   }
 
 //----------------------------------------------------------------------------
-vtkSMPAlgorithm::~vtkSMPAlgorithm()
+vtkSplittingAlgorithm::~vtkSplittingAlgorithm()
   {
   }
 
 //----------------------------------------------------------------------------
 // This is the superclasses style of Execute method.  Convert it into
 // an SMP style Execute method.
-int vtkSMPAlgorithm::ProcessRequest(
+int vtkSplittingAlgorithm::ProcessRequest(
   vtkInformation* request,
   vtkInformationVector** inputVector,
   vtkInformationVector* outputVector,
@@ -39,10 +39,10 @@ int vtkSMPAlgorithm::ProcessRequest(
     {
     outputs[i] = vtkThreadLocal<vtkDataObject>::New();
     vtkInformation* outInfo = outputVector->GetInformationObject(i);
-    if (outInfo->Has(vtkSMPPipeline::DATA_OBJECT_CONCRETE_TYPE()))
+    if (outInfo->Has(vtkParallelCompositeDataPipeline::DATA_OBJECT_CONCRETE_TYPE()))
       {
       outputs[i]->SetSpecificClassName(
-          outInfo->Get(vtkSMPPipeline::DATA_OBJECT_CONCRETE_TYPE()));
+        outInfo->Get(vtkParallelCompositeDataPipeline::DATA_OBJECT_CONCRETE_TYPE()));
       }
     }
 
@@ -73,7 +73,7 @@ int vtkSMPAlgorithm::ProcessRequest(
 
 //----------------------------------------------------------------------------
 // The execute method created by the subclass.
-int vtkSMPAlgorithm::SplitData(
+int vtkSplittingAlgorithm::SplitData(
   vtkInformation* vtkNotUsed( request ),
   vtkInformationVector** vtkNotUsed( inputVector ),
   vtkInformationVector* vtkNotUsed( outputVector ),

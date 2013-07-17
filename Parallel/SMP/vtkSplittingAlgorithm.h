@@ -1,5 +1,5 @@
-#ifndef __vtkSMPAlgorithm_h
-#define __vtkSMPAlgorithm_h
+#ifndef __vtkSplittingAlgorithm_h
+#define __vtkSplittingAlgorithm_h
 
 #include "vtkParallelSMPModule.h" // For export macro
 #include "vtkSetGet.h"
@@ -9,7 +9,7 @@ class vtkInformation;
 class vtkInformationVector;
 template<class T> class vtkThreadLocal;
 
-class VTKPARALLELSMP_EXPORT vtkSMPAlgorithm
+class VTKPARALLELSMP_EXPORT vtkSplittingAlgorithm
 {
 public:
   virtual int ProcessRequest(vtkInformation* request,
@@ -22,8 +22,8 @@ public:
   int GetSplitDataset() { return this->SplitDataset; }
 
 protected:
-  vtkSMPAlgorithm();
-  ~vtkSMPAlgorithm();
+  vtkSplittingAlgorithm();
+  ~vtkSplittingAlgorithm();
 
   // Description:
   // This is called by the superclass.
@@ -39,8 +39,8 @@ protected:
   int SplitDataset;
 
 private:
-  vtkSMPAlgorithm(const vtkSMPAlgorithm&);  // Not implemented.
-  void operator=(const vtkSMPAlgorithm&);  // Not implemented.
+  vtkSplittingAlgorithm(const vtkSplittingAlgorithm&);  // Not implemented.
+  void operator=(const vtkSplittingAlgorithm&);  // Not implemented.
 };
 
 #endif

@@ -4,14 +4,14 @@
 #include "vtkParallelSMPModule.h" // For export macro
 #include "vtkCompositeDataPipeline.h"
 
-class VTKPARALLELSMP_EXPORT vtkSMPPipeline : public vtkCompositeDataPipeline
+class VTKPARALLELSMP_EXPORT vtkParallelCompositeDataPipeline : public vtkCompositeDataPipeline
 {
-  vtkSMPPipeline(const vtkSMPPipeline&);
-  void operator =(const vtkSMPPipeline&);
+  vtkParallelCompositeDataPipeline(const vtkParallelCompositeDataPipeline&);
+  void operator =(const vtkParallelCompositeDataPipeline&);
 
 protected:
-  vtkSMPPipeline();
-  ~vtkSMPPipeline();
+  vtkParallelCompositeDataPipeline();
+  ~vtkParallelCompositeDataPipeline();
 
   virtual int ExecuteData(vtkInformation* request,
                           vtkInformationVector** inInfoVec,
@@ -27,13 +27,13 @@ protected:
 public:
   friend class ParallelFilterExecutor;
 
-  vtkTypeMacro(vtkSMPPipeline, vtkCompositeDataPipeline);
-  static vtkSMPPipeline* New();
+  vtkTypeMacro(vtkParallelCompositeDataPipeline, vtkCompositeDataPipeline);
+  static vtkParallelCompositeDataPipeline* New();
   void PrintSelf(ostream &os, vtkIndent indent);
 
   // Description:
   // Key defining the concrete type of output data to make sure
-  // the vtkSMPAlgorithm will produce the right type of temp data.
+  // the vtkSplittingAlgorithm will produce the right type of temp data.
   static vtkInformationStringKey* DATA_OBJECT_CONCRETE_TYPE();
 
 };
