@@ -12,6 +12,7 @@
 #include "vtkSMPMergePoints.h"
 #include "vtkSMPMinMaxTree.h"
 #include "vtkSMPTransform.h"
+#include "vtkSMPPipeline.h"
 #include "vtkTestUtilities.h"
 #include "vtkThreshold.h"
 #include "vtkTimerLog.h"
@@ -101,6 +102,10 @@ int TestSMPMesh( int argc, char * argv [] )
     cerr << "You should specify a filename" << endl;
     return 1;
     }
+
+  vtkSMPPipeline* refExec = vtkSMPPipeline::New();
+  vtkAlgorithm::SetDefaultExecutivePrototype(refExec);
+  refExec->Delete();
   
   vtkDataSetReader* aa = vtkDataSetReader::New();
   aa->SetFileName(argv[1]);
@@ -123,13 +128,15 @@ int TestSMPMesh( int argc, char * argv [] )
 
   vtkContourFilter* isosurface1 = vtkContourFilter::New();
 
-  vtkContourFilter* isosurface2 = vtkSMPContourFilter::New();
+  vtkSMPContourFilter* isosurface2 = vtkSMPContourFilter::New();
   vtkSMPMergePoints* locator = vtkSMPMergePoints::New();
   isosurface2->SetLocator( locator );
   locator->Delete();
   vtkSMPMinMaxTree* tree = vtkSMPMinMaxTree::New();
   isosurface2->SetScalarTree(tree);
   tree->Delete();
+  
+  isosurface2->SplitDatasetOn(); // Testing new pipeline + splitting behavior
 
   testMesh(aa,isosurface1);
   testMesh(aa,isosurface2,false);

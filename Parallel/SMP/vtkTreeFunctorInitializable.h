@@ -9,7 +9,7 @@ class VTKPARALLELSMP_EXPORT vtkTreeFunctorInitializable : public vtkTreeFunctor
 {
 public:
   vtkTypeMacro(vtkTreeFunctorInitializable,vtkTreeFunctor);
-  void PrintSelf(ostream& os, vtkIndent indent);
+  virtual void PrintSelf(ostream& os, vtkIndent indent);
 
   virtual void Init ( int ) const = 0;
   bool ShouldInitialize ( int ) const;

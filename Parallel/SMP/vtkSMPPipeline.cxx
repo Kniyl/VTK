@@ -1,4 +1,5 @@
 #include "vtkSMPPipeline.h"
+#include "vtkSMPAlgorithm.h"
 #include "vtkParallelOperators.h"
 #include "vtkRangeFunctorInitializable.h"
 #include "vtkRange1D.h"
@@ -201,7 +202,8 @@ int vtkSMPPipeline::ExecuteData(vtkInformation *request, vtkInformationVector **
     {
     if (this->GetNumberOfOutputPorts())
       {
-      if (this->Algorithm->IsA("vtkSMPAlgorithm"))
+      vtkSMPAlgorithm* algo = dynamic_cast<vtkSMPAlgorithm *>(this->Algorithm);
+      if (algo && algo->GetSplitDataset())
         {
         vtkDebugMacro(<< "vtkSMPAlgorithm will produce a composite data output from each input bloc")
         this->Superclass::ExecuteSimpleAlgorithm(request, inInfoVec, outInfoVec, compositePort);
@@ -340,7 +342,8 @@ int vtkSMPPipeline::CheckDataObject(int port, vtkInformationVector* outInfoVec)
   // SMP Algorithm declare some type for their output but
   // actually produce a multi pieces dataset. Each piece
   // being of that type.
-  if (this->Algorithm->IsA("vtkSMPAlgorithm"))
+  vtkSMPAlgorithm* algo = dynamic_cast<vtkSMPAlgorithm*>(this->Algorithm);
+  if (algo && algo->GetSplitDataset())
     {
     vtkInformation* outInfo = outInfoVec->GetInformationObject(port);
     // For now, only create a Multi Piece Dataset. Checks

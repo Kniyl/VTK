@@ -19,7 +19,7 @@ protected:
 
 public:
   vtkTypeMacro(vtkRangeFunctor,vtkObject);
-  void PrintSelf(ostream& os, vtkIndent indent);
+  virtual void PrintSelf(ostream& os, vtkIndent indent);
 
   virtual void operator()(vtkRange*) const = 0;
 };

@@ -19,7 +19,7 @@ protected:
 
 public:
   vtkTypeMacro(vtkTreeFunctor,vtkObject);
-  void PrintSelf(ostream& os, vtkIndent indent);
+  virtual void PrintSelf(ostream& os, vtkIndent indent);
 
   virtual void operator()(vtkIdType, vtkLocalData*) const = 0;
   virtual vtkLocalData* getLocal(int tid) const;

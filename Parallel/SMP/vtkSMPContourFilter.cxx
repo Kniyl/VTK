@@ -60,7 +60,7 @@ class vtkSMPContourFilterLocalData : public vtkLocalData
   public:
     vtkTypeMacro(vtkSMPContourFilterLocalData,vtkLocalData);
     static vtkSMPContourFilterLocalData* New();
-    void PrintSelf(ostream& os, vtkIndent indent)
+    virtual void PrintSelf(ostream& os, vtkIndent indent)
       {
       this->Superclass::PrintSelf(os,indent);
       os << indent << "Locator: (" << Locator << ")" << endl;
@@ -131,7 +131,7 @@ protected:
 public:
   vtkTypeMacro(ContourRangeFunctor,vtkRangeFunctorInitializable);
   static ContourRangeFunctor* New();
-  void PrintSelf(ostream &os, vtkIndent indent)
+  virtual void PrintSelf(ostream &os, vtkIndent indent)
     {
     this->Superclass::PrintSelf(os,indent);
     }
@@ -256,7 +256,7 @@ public:
       }
     }
 
-  void Init(int tid) const
+  virtual void Init(int tid) const
     {
     vtkPoints* pts = this->newPts->NewLocal(tid);
     pts->Allocate( this->estimatedSize, this->estimatedSize );
@@ -291,6 +291,78 @@ public:
 };
 
 vtkStandardNewMacro(ContourRangeFunctor);
+
+class ContourRangeAndSplit : public ContourRangeFunctor
+{
+    ContourRangeAndSplit(const ContourRangeAndSplit&);
+    void operator=(const ContourRangeAndSplit&);
+  protected:
+    ContourRangeAndSplit()
+      {
+      PolyOutputs = vtkThreadLocal<vtkPolyData>::New();
+      }
+    ~ContourRangeAndSplit()
+      {
+      PolyOutputs->Delete();
+      }
+
+    vtkThreadLocal<vtkDataObject>* outputs;
+  public:
+    vtkTypeMacro(ContourRangeAndSplit,ContourRangeFunctor);
+    static ContourRangeAndSplit* New();
+    virtual void PrintSelf(ostream& os, vtkIndent indent)
+      {
+      this->Superclass::PrintSelf(os,indent);
+      }
+
+    vtkThreadLocal<vtkPolyData>* PolyOutputs;
+
+    void SetData( vtkDataSet* _input, vtkIncrementalPointLocator* _locator,
+                  vtkIdType& _size, double* _values, int _number,
+                  vtkDataArray* _scalars, int _compute,
+                  vtkThreadLocal<vtkDataObject>* _outputs)
+      {
+      vtkCutter::GetCellTypeDimensions(cellTypeDimensions);
+
+      this->input = _input;
+      this->inPd = _input->GetPointData();
+      this->inCd = _input->GetCellData();
+      this->refLocator = _locator;
+      this->estimatedSize = _size;
+      this->values = _values;
+      this->numContours = _number;
+      this->inScalars = _scalars;
+      this->computeScalars = _compute;
+
+      this->outputs = _outputs;
+
+      this->Init(this->MasterThreadId);
+      }
+  
+    virtual void Init(int tid) const
+      {
+      this->Superclass::Init(tid);
+
+      vtkPolyData* output = vtkPolyData::SafeDownCast(
+          this->outputs->NewLocal(tid));
+      this->PolyOutputs->SetLocal(output,tid);
+
+      vtkPointData* pd = output->GetPointData();
+      if (!this->computeScalars)
+      {
+        pd->CopyScalarsOff();
+      }
+      pd->InterpolateAllocate(
+          this->inPd,this->estimatedSize,this->estimatedSize);
+      this->outPd->SetLocal(pd,tid);
+
+      vtkCellData* cd = output->GetCellData();
+      cd->CopyAllocate(this->inCd,this->estimatedSize,this->estimatedSize);
+      this->outCd->SetLocal(cd,tid);
+      }
+};
+
+vtkStandardNewMacro(ContourRangeAndSplit);
 
 /* ================================================================================
   Generic contouring: Functors for parallel execution with ScalarTree
@@ -329,7 +401,7 @@ protected:
 public:
   vtkTypeMacro(ContourTraversalFunctor,vtkTreeFunctorInitializable);
   static ContourTraversalFunctor* New();
-  void PrintSelf(ostream &os, vtkIndent indent)
+  virtual void PrintSelf(ostream &os, vtkIndent indent)
     {
     this->Superclass::PrintSelf(os,indent);
     }
@@ -476,14 +548,98 @@ public:
 
 vtkStandardNewMacro(ContourTraversalFunctor);
 
+class ContourTraverseAndSplit : public ContourTraversalFunctor
+{
+    ContourTraverseAndSplit(const ContourTraverseAndSplit&);
+    void operator=(const ContourTraverseAndSplit&);
+  protected:
+    ContourTraverseAndSplit()
+      {
+      PolyOutputs = vtkThreadLocal<vtkPolyData>::New();
+      }
+    ~ContourTraverseAndSplit()
+      {
+      PolyOutputs->Delete();
+      }
+
+    vtkThreadLocal<vtkDataObject>* outputs;
+  public:
+    vtkTypeMacro(ContourTraverseAndSplit,ContourTraversalFunctor);
+    static ContourTraverseAndSplit* New();
+    virtual void PrintSelf(ostream& os, vtkIndent indent)
+      {
+      this->Superclass::PrintSelf(os,indent);
+      }
+
+    vtkThreadLocal<vtkPolyData>* PolyOutputs;
+
+    void SetData( vtkDataSet* _input, vtkIncrementalPointLocator* _locator,
+                  vtkIdType& _size, double* _values, int _number,
+                  vtkDataArray* _scalars, int _compute,
+                  vtkThreadLocal<vtkDataObject>* _outputs)
+      {
+      this->input = _input;
+      this->inPd = _input->GetPointData();
+      this->inCd = _input->GetCellData();
+      this->refLocator = _locator;
+      this->estimatedSize = _size;
+      this->values = _values;
+      this->numContours = _number;
+      this->inScalars = _scalars;
+      this->computeScalars = _compute;
+
+      this->outputs = _outputs;
+
+      this->Init(this->MasterThreadId);
+      }
+  
+    virtual void Init(int tid) const
+      {
+      this->Superclass::Init(tid);
+
+      vtkPolyData* output = vtkPolyData::SafeDownCast(
+          this->outputs->NewLocal(tid));
+      this->PolyOutputs->SetLocal(output,tid);
+
+      vtkPointData* pd = output->GetPointData();
+      if (!this->computeScalars)
+        {
+        pd->CopyScalarsOff();
+        }
+      pd->InterpolateAllocate(
+          this->inPd,this->estimatedSize,this->estimatedSize);
+      this->outPd->SetLocal(pd,tid);
+
+      vtkCellData* cd = output->GetCellData();
+      cd->CopyAllocate(this->inCd,this->estimatedSize,this->estimatedSize);
+      this->outCd->SetLocal(cd,tid);
+      }
+};
+
+vtkStandardNewMacro(ContourTraverseAndSplit);
+
+
+
+int vtkSMPContourFilter::ProcessRequest(vtkInformation* request,
+                                        vtkInformationVector** inVector,
+                                        vtkInformationVector* outVector)
+  {
+  if(!this->vtkSMPAlgorithm::ProcessRequest(
+        request,inVector,outVector,this->GetNumberOfOutputPorts()))
+    {
+    return this->Superclass::ProcessRequest(request,inVector,outVector);
+    }
+  return 1;
+  }
+
 /* ================================================================================
  General contouring filter.  Handles arbitrary input.
  ================================================================================ */
 int vtkSMPContourFilter::RequestData(
-  vtkInformation* request,
-  vtkInformationVector** inputVector,
-  vtkInformationVector* outputVector)
-{
+    vtkInformation* request,
+    vtkInformationVector** inputVector,
+    vtkInformationVector* outputVector)
+  {
   // get the input
   vtkInformation* inInfo = inputVector[0]->GetInformationObject(0);
   vtkDataSet *input = vtkDataSet::SafeDownCast(
@@ -708,21 +864,21 @@ int vtkSMPContourFilter::RequestData(
       }
     else
       {
-      ContourRangeFunctor* my_contour = ContourRangeFunctor::New();
-      my_contour->SetData( input, newPts, inCd, inPd, this->Locator,
+      ContourRangeFunctor* contourFunctor = ContourRangeFunctor::New();
+      contourFunctor->SetData( input, newPts, inCd, inPd, this->Locator,
                            estimatedSize, values, numContours, inScalars, this->ComputeScalars,
                            newVerts, newLines, newPolys, outCd, outPd );
-      for ( my_contour->dimensionality = 1; my_contour->dimensionality <= 3; ++(my_contour->dimensionality) )
+      for ( contourFunctor->dimensionality = 1; contourFunctor->dimensionality <= 3; ++(contourFunctor->dimensionality) )
         {
-        vtkParallelOperators::ForEach( 0, numCells, my_contour );
+        vtkParallelOperators::ForEach( 0, numCells, contourFunctor );
         }
-      computedLocator = my_contour->Locator;
-      computedNewPts = my_contour->newPts;
-      computedNewVerts = my_contour->newVerts;
-      computedNewLines = my_contour->newLines;
-      computedNewPolys = my_contour->newPolys;
-      computedOutPd = my_contour->outPd;
-      computedOutCd = my_contour->outCd;
+      computedLocator = contourFunctor->Locator;
+      computedNewPts = contourFunctor->newPts;
+      computedNewVerts = contourFunctor->newVerts;
+      computedNewLines = contourFunctor->newLines;
+      computedNewPolys = contourFunctor->newPolys;
+      computedOutPd = contourFunctor->outPd;
+      computedOutCd = contourFunctor->outCd;
       computedLocator->Register(this);
       computedNewPts->Register(this);
       computedNewVerts->Register(this);
@@ -730,7 +886,7 @@ int vtkSMPContourFilter::RequestData(
       computedNewPolys->Register(this);
       computedOutPd->Register(this);
       computedOutCd->Register(this);
-      my_contour->Delete();
+      contourFunctor->Delete();
       }
     // Merge
     vtkMergeDataSets* mergeOp = vtkMergeDataSets::New();
@@ -841,4 +997,208 @@ int vtkSMPContourFilter::RequestData(
   output->Squeeze();
 
   return 1;
-}
+  }
+
+int vtkSMPContourFilter::SplitData(
+    vtkInformation* request,
+    vtkInformationVector** inputVector,
+    vtkInformationVector* outputVector,
+    vtkThreadLocal<vtkDataObject>** outputs)
+  {
+  // get the input
+  vtkInformation* inInfo = inputVector[0]->GetInformationObject(0);
+  vtkDataSet *input = vtkDataSet::SafeDownCast(
+    inInfo->Get(vtkDataObject::DATA_OBJECT()));
+  if (!input)
+    {
+    return 0;
+    }
+
+  // get the contours
+  int numContours=this->ContourValues->GetNumberOfContours();
+  double *values=this->ContourValues->GetValues();
+  int i;
+
+  // is there data to process?
+  if (!this->GetInputArrayToProcess(0, inputVector))
+    {
+    return 1;
+    }
+
+  int sType = this->GetInputArrayToProcess(0, inputVector)->GetDataType();
+
+  // handle 2D images
+  if (vtkImageData::SafeDownCast(input) && sType != VTK_BIT &&
+      !vtkUniformGrid::SafeDownCast(input))
+    {
+    vtkWarningMacro(<< "vtkImageData input not supported");
+    return 0;
+    } //if image data
+
+  // handle 3D RGrids
+  if (vtkRectilinearGrid::SafeDownCast(input) && sType != VTK_BIT)
+    {
+    vtkWarningMacro(<< "vtkRectilinearGrid input not supported");
+    return 0;
+    } // if 3D Rgrid
+
+  // handle 3D SGrids
+  if (vtkStructuredGrid::SafeDownCast(input) && sType != VTK_BIT)
+    {
+    vtkWarningMacro(<< "vtkStructuredGrid input not supported");
+    } //if 3D SGrid
+
+  vtkDataArray *inScalars;
+  vtkIdType numCells, estimatedSize;
+
+  if (!outputs[0]) {return 0;}
+
+  vtkDebugMacro(<< "Executing contour filter");
+  if (input->GetDataObjectType() == VTK_UNSTRUCTURED_GRID && !this->UseScalarTree)
+    {
+    vtkDebugMacro(<< "vtkUnstructuredGrid input not supported");
+    return 0;
+    } //if type VTK_UNSTRUCTURED_GRID
+  else
+    {
+    numCells = input->GetNumberOfCells();
+    inScalars = this->GetInputArrayToProcess(0,inputVector);
+    if ( ! inScalars || numCells < 1 )
+      {
+      vtkDebugMacro(<<"No data to contour");
+      return 1;
+      }
+
+    // Create objects to hold output of contour operation. First estimate
+    // allocation size.
+    //
+    estimatedSize=
+        static_cast<vtkIdType>(pow(static_cast<double>(numCells),.75));
+    estimatedSize *= numContours;
+    estimatedSize = estimatedSize / 1024 * 1024; //multiple of 1024
+    if (estimatedSize < 1024)
+      {
+      estimatedSize = 1024;
+      }
+
+    // locator used to merge potentially duplicate points
+    if ( this->Locator == NULL )
+      {
+      this->CreateDefaultLocator();
+      }
+
+    // If enabled, build a scalar tree to accelerate search
+    //
+    vtkSMPMinMaxTree* parallelTree = vtkSMPMinMaxTree::SafeDownCast(this->ScalarTree);
+    if ( !this->UseScalarTree || parallelTree )
+      {
+      vtkThreadLocal<vtkPolyData>* outDatasets;
+      vtkThreadLocal<vtkPoints>* outPoints;
+      vtkThreadLocal<vtkCellArray>* outVerts;
+      vtkThreadLocal<vtkCellArray>* outLines;
+      vtkThreadLocal<vtkCellArray>* outPolys;
+
+      // Init (thread local init is drown into first ForEach)
+      input->GetCellType( 0 ); // Build cell representation so that Threads can access them safely
+      if ( this->UseScalarTree )
+        {
+        ContourTraverseAndSplit* treeFunctor = ContourTraverseAndSplit::New();
+        treeFunctor->SetData( input, this->Locator, estimatedSize, values,
+                           numContours, inScalars, this->ComputeScalars, outputs[0] );
+        parallelTree->SetDataSet(input);
+        for ( i = 0; i < numContours; ++i )
+          {
+          treeFunctor->ScalarValue = values[i];
+          parallelTree->InitTraversal(values[i]);
+          vtkParallelOperators::Traverse(parallelTree,treeFunctor);
+          }
+        outDatasets = treeFunctor->PolyOutputs;
+        outPoints = treeFunctor->newPts;
+        outVerts = treeFunctor->newVerts;
+        outLines = treeFunctor->newLines;
+        outPolys = treeFunctor->newPolys;
+        outDatasets->Register(this);
+        outPoints->Register(this);
+        outVerts->Register(this);
+        outLines->Register(this);
+        outPolys->Register(this);
+        treeFunctor->Delete();
+        }
+      else
+        {
+        ContourRangeAndSplit* contourFunctor = ContourRangeAndSplit::New();
+        contourFunctor->SetData( input, this->Locator, estimatedSize, values,
+                           numContours, inScalars, this->ComputeScalars, outputs[0] );
+        for ( contourFunctor->dimensionality = 1; contourFunctor->dimensionality <= 3; ++(contourFunctor->dimensionality) )
+          {
+          vtkParallelOperators::ForEach( 0, numCells, contourFunctor );
+          }
+        outDatasets = contourFunctor->PolyOutputs;
+        outPoints = contourFunctor->newPts;
+        outVerts = contourFunctor->newVerts;
+        outLines = contourFunctor->newLines;
+        outPolys = contourFunctor->newPolys;
+        outDatasets->Register(this);
+        outPoints->Register(this);
+        outVerts->Register(this);
+        outLines->Register(this);
+        outPolys->Register(this);
+        contourFunctor->Delete();
+        }
+
+      // No more merge in V2 but we finalize each output
+      // Easier in sequential
+      vtkThreadLocal<vtkPolyData>::iterator itOutput;
+      vtkThreadLocal<vtkPoints>::iterator newPts;
+      vtkThreadLocal<vtkCellArray>::iterator newVerts;
+      vtkThreadLocal<vtkCellArray>::iterator newLines;
+      vtkThreadLocal<vtkCellArray>::iterator newPolys;
+      for ( itOutput = outDatasets->Begin(),
+            newPts = outPoints->Begin(),
+            newVerts = outVerts->Begin(),
+            newLines = outLines->Begin(),
+            newPolys = outPolys->Begin();
+            itOutput != outDatasets->End();
+            ++itOutput, ++newPts, ++newVerts, ++newLines, ++newPolys)
+        {
+        vtkDebugMacro(<<"Created: "
+                      << (*newPts)->GetNumberOfPoints() << " points, "
+                      << (*newVerts)->GetNumberOfCells() << " verts, "
+                      << (*newLines)->GetNumberOfCells() << " lines, "
+                      << (*newPolys)->GetNumberOfCells() << " triangles");
+        (*itOutput)->SetPoints(*newPts);
+
+        if ((*newVerts)->GetNumberOfCells())
+          {
+          (*itOutput)->SetVerts(*newVerts);
+          }
+
+        if ((*newLines)->GetNumberOfCells())
+          {
+          (*itOutput)->SetLines(*newLines);
+          }
+
+        if ((*newPolys)->GetNumberOfCells())
+          {
+          (*itOutput)->SetPolys(*newPolys);
+          }
+        (*itOutput)->Squeeze();
+        }
+
+      outDatasets->UnRegister(this);
+      outPoints->UnRegister(this);
+      outVerts->UnRegister(this);
+      outLines->UnRegister(this);
+      outPolys->UnRegister(this);
+      } //if using scalar tree
+    else
+      {
+      vtkWarningMacro(<< "Scalar trees that are not a vtkSMPMinMaxTree not supported");
+      return 0;
+      } //using scalar tree
+
+    this->Locator->Initialize();//releases leftover memory
+    } //else if not vtkUnstructuredGrid
+
+  return 1;
+  }
