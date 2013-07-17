@@ -9,6 +9,20 @@ class vtkInformation;
 class vtkInformationVector;
 template<class T> class vtkThreadLocal;
 
+#define vtkSplittingFilterStandardProcessRequest(classname)               \
+int classname::ProcessRequest(vtkInformation* request,                    \
+                                        vtkInformationVector** inVector,  \
+                                        vtkInformationVector* outVector)  \
+  {                                                                       \
+  if(!this->vtkSplittingAlgorithm::ProcessRequest(                        \
+        request,inVector,outVector,this->GetNumberOfOutputPorts()))       \
+    {                                                                     \
+    return this->Superclass::ProcessRequest(request,inVector,outVector);  \
+    }                                                                     \
+  return 1;                                                               \
+  }
+
+
 class VTKPARALLELSMP_EXPORT vtkSplittingAlgorithm
 {
 public:

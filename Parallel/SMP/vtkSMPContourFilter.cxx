@@ -619,18 +619,7 @@ class ContourTraverseAndSplit : public ContourTraversalFunctor
 vtkStandardNewMacro(ContourTraverseAndSplit);
 
 
-
-int vtkSMPContourFilter::ProcessRequest(vtkInformation* request,
-                                        vtkInformationVector** inVector,
-                                        vtkInformationVector* outVector)
-  {
-  if(!this->vtkSplittingAlgorithm::ProcessRequest(
-        request,inVector,outVector,this->GetNumberOfOutputPorts()))
-    {
-    return this->Superclass::ProcessRequest(request,inVector,outVector);
-    }
-  return 1;
-  }
+vtkSplittingFilterStandardProcessRequest(vtkSMPContourFilter);
 
 /* ================================================================================
  General contouring filter.  Handles arbitrary input.
