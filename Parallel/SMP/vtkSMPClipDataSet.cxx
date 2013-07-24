@@ -146,6 +146,8 @@ public:
     input = i; clipScalars = c; inPD = pd; inCD = cd; refLocator = l;
     estimatedSize = e; value = v; insideOut = inside; numOutputs = num;
 
+    input->GetCell(0);
+
     int tid = this->MasterThreadId;
     input->GetCell(0,cell->NewLocal(tid));
     cellScalars->NewLocal(tid)->Allocate(VTK_CELL_SIZE);
@@ -324,21 +326,31 @@ class ClipDataSetSplit : public ClipDataSetRange
       input = i; clipScalars = c; inPD = pd; inCD = cd; refLocator = l;
       estimatedSize = e; value = v; insideOut = inside; numOutputs = num;
 
+      input->GetCell(0);
+
       this->outputs = o;
       this->generatedOutputs = go;
+
+      for (int i = 0; i < num; ++i)
+        {
+        conn[i] = vtkThreadLocal<vtkCellArray>::New();
+        outCD[i] = vtkThreadLocal<vtkCellData>::New();
+        types[i] = vtkThreadLocal<vtkUnsignedCharArray>::New();
+        locs[i] = vtkThreadLocal<vtkIdTypeArray>::New();
+        }
 
       this->Init(this->MasterThreadId);
       }
 
     virtual void Init(int tid) const
       {
-      vtkUnstructuredGrid* output[2] = { vtkUnstructuredGrid::SafeDownCast(
-          this->outputs->GetLocal(tid)), NULL };
+      vtkUnstructuredGrid* output[2];
+      output[0] = vtkUnstructuredGrid::SafeDownCast(this->outputs->NewLocal(tid));
       USOutputs->SetLocal(output[0],tid);
       if (numOutputs > 1)
         {
         output[1] = vtkUnstructuredGrid::SafeDownCast(
-          this->generatedOutputs->GetLocal(tid));
+          this->generatedOutputs->NewLocal(tid));
         generatedUSOutputs->SetLocal(output[1],tid);
         }
       cell->NewLocal(tid);

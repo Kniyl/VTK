@@ -28,7 +28,10 @@ int vtkSplittingAlgorithm::ProcessRequest(
   vtkInformationVector* outputVector,
   int NumberOfOutputPorts)
   {
-  if(!request->Has(vtkDemandDrivenPipeline::REQUEST_DATA()) || !this->SplitDataset)
+  if( !request->Has(vtkDemandDrivenPipeline::REQUEST_DATA()) ||
+      !this->SplitDataset ||
+      !outputVector->GetInformationObject(0)->Has(
+        vtkParallelCompositeDataPipeline::DATA_OBJECT_CONCRETE_TYPE()) )
     {
     return 0;
     }
@@ -39,11 +42,8 @@ int vtkSplittingAlgorithm::ProcessRequest(
     {
     outputs[i] = vtkThreadLocal<vtkDataObject>::New();
     vtkInformation* outInfo = outputVector->GetInformationObject(i);
-    if (outInfo->Has(vtkParallelCompositeDataPipeline::DATA_OBJECT_CONCRETE_TYPE()))
-      {
-      outputs[i]->SetSpecificClassName(
-        outInfo->Get(vtkParallelCompositeDataPipeline::DATA_OBJECT_CONCRETE_TYPE()));
-      }
+    outputs[i]->SetSpecificClassName(
+      outInfo->Get(vtkParallelCompositeDataPipeline::DATA_OBJECT_CONCRETE_TYPE()));
     }
 
   if (this->SplitData(request, inputVector, outputVector, outputs))
