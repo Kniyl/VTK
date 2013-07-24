@@ -73,13 +73,13 @@ public:
     }
 };
 
-class DoClip : public vtkRangeFunctorInitializable
+class ClipDataSetRange : public vtkRangeFunctorInitializable
 {
-  DoClip(const DoClip&);
-  void operator =(const DoClip&);
+  ClipDataSetRange(const ClipDataSetRange&);
+  void operator =(const ClipDataSetRange&);
 
 protected:
-  DoClip() : input(0), clipScalars(0), inPD(0), inCD(0), estimatedSize(0),
+  ClipDataSetRange() : input(0), clipScalars(0), inPD(0), inCD(0), estimatedSize(0),
              value(0.0), insideOut(0), numOutputs(0), refLocator(0)
     {
     cell = vtkThreadLocal<vtkGenericCell>::New();
@@ -93,7 +93,7 @@ protected:
     types[0] = types[1] = 0;
     locs[0] = locs[1] = 0;
     }
-  ~DoClip()
+  ~ClipDataSetRange()
     {
     cell->Delete();
     cellScalars->Delete();
@@ -131,9 +131,9 @@ public:
   vtkThreadLocal<vtkUnsignedCharArray>* types[2];
   vtkThreadLocal<vtkIdTypeArray>* locs[2];
 
-  vtkTypeMacro(DoClip,vtkRangeFunctorInitializable);
-  static DoClip* New();
-  void PrintSelf(ostream &os, vtkIndent indent)
+  vtkTypeMacro(ClipDataSetRange,vtkRangeFunctorInitializable);
+  static ClipDataSetRange* New();
+  virtual void PrintSelf(ostream &os, vtkIndent indent)
     {
     this->Superclass::PrintSelf(os,indent);
     }
@@ -167,7 +167,7 @@ public:
     Initialized(tid);
     }
 
-  void Init(int tid) const
+  virtual void Init(int tid) const
     {
     cell->NewLocal(tid);
     cellScalars->NewLocal(tid)->Allocate(VTK_CELL_SIZE);
@@ -286,7 +286,126 @@ public:
     }
 };
 
-vtkStandardNewMacro(DoClip);
+class ClipDataSetSplit : public ClipDataSetRange
+{
+    ClipDataSetSplit(const ClipDataSetSplit&);
+    void operator=(const ClipDataSetSplit&);
+  protected:
+    ClipDataSetSplit() : ClipDataSetRange(), outputs(0), generatedOutputs(0)
+      {
+      USOutputs = vtkThreadLocal<vtkUnstructuredGrid>::New();
+      generatedUSOutputs = vtkThreadLocal<vtkUnstructuredGrid>::New();
+      }
+    ~ClipDataSetSplit()
+      {
+      USOutputs->Delete();
+      generatedUSOutputs->Delete();
+      }
+
+    vtkThreadLocal<vtkDataObject>* outputs;
+    vtkThreadLocal<vtkDataObject>* generatedOutputs;
+
+    vtkThreadLocal<vtkUnstructuredGrid>* USOutputs;
+    vtkThreadLocal<vtkUnstructuredGrid>* generatedUSOutputs;
+
+  public:
+    vtkTypeMacro(ClipDataSetSplit,ClipDataSetRange);
+    static ClipDataSetSplit* New();
+    virtual void PrintSelf(ostream& os, vtkIndent indent)
+      {
+      this->Superclass::PrintSelf(os,indent);
+      }
+
+    void SetData(vtkDataSet* i, vtkDataArray* c, vtkPointData* pd, vtkCellData* cd,
+                 vtkIdType e, double v, int inside, int num,
+                 vtkIncrementalPointLocator* l, vtkThreadLocal<vtkDataObject>* o,
+                 vtkThreadLocal<vtkDataObject>* go)
+      {
+      input = i; clipScalars = c; inPD = pd; inCD = cd; refLocator = l;
+      estimatedSize = e; value = v; insideOut = inside; numOutputs = num;
+
+      this->outputs = o;
+      this->generatedOutputs = go;
+
+      this->Init(this->MasterThreadId);
+      }
+
+    virtual void Init(int tid) const
+      {
+      vtkUnstructuredGrid* output[2] = { vtkUnstructuredGrid::SafeDownCast(
+          this->outputs->GetLocal(tid)), NULL };
+      USOutputs->SetLocal(output[0],tid);
+      if (numOutputs > 1)
+        {
+        output[1] = vtkUnstructuredGrid::SafeDownCast(
+          this->generatedOutputs->GetLocal(tid));
+        generatedUSOutputs->SetLocal(output[1],tid);
+        }
+      cell->NewLocal(tid);
+      cellScalars->NewLocal(tid)->Allocate(VTK_CELL_SIZE);
+      vtkPoints* pts = newPoints->NewLocal(tid);
+      pts->Allocate(estimatedSize,estimatedSize/2);
+      vtkPointData* pd = output[0]->GetPointData();
+      vtkDataSetAttributes* tempDSA = vtkDataSetAttributes::New();
+      tempDSA->InterpolateAllocate(inPD, 1, 2);
+      pd->InterpolateAllocate(inPD,estimatedSize,estimatedSize/2);
+      tempDSA->Delete();
+      outPD->SetLocal(pd,tid);
+      locator->NewLocal(refLocator,tid)->InitPointInsertion (pts, input->GetBounds());
+      vtkCellData* cd;
+      for (int i = 0; i < numOutputs; ++i)
+        {
+        vtkCellArray* _conn = conn[i]->NewLocal(tid);
+        _conn->Allocate(estimatedSize,estimatedSize/2);
+        _conn->InitTraversal();
+        cd = output[i]->GetCellData();
+        cd->CopyAllocate(inCD,estimatedSize,estimatedSize/2);
+        outCD[i]->SetLocal(cd,tid);
+        types[i]->NewLocal(tid)->Allocate(estimatedSize,estimatedSize/2);
+        locs[i]->NewLocal(tid)->Allocate(estimatedSize,estimatedSize/2);
+        }
+      Initialized(tid);
+      }
+
+    void FinalizeOutput()
+      {
+      vtkThreadLocal<vtkUnstructuredGrid>::iterator itOutput;
+      vtkThreadLocal<vtkPoints>::iterator itPts;
+      vtkThreadLocal<vtkUnsignedCharArray>::iterator itTypes;
+      vtkThreadLocal<vtkIdTypeArray>::iterator itLocs;
+      vtkThreadLocal<vtkCellArray>::iterator itConn;
+      for ( itOutput = this->USOutputs->Begin(),
+            itPts = this->newPoints->Begin(),
+            itTypes = this->types[0]->Begin(),
+            itLocs = this->locs[0]->Begin(),
+            itConn = this->conn[0]->Begin();
+            itOutput != this->USOutputs->End();
+            ++itOutput, ++itPts, ++itTypes, ++itLocs, ++itConn )
+        {
+        (*itOutput)->SetPoints(*itPts);
+        (*itOutput)->SetCells(*itTypes, *itLocs, *itConn);
+        (*itOutput)->Squeeze();
+        }
+      if (numOutputs > 1)
+        {
+        for ( itOutput = this->generatedUSOutputs->Begin(),
+              itPts = this->newPoints->Begin(),
+              itTypes = this->types[1]->Begin(),
+              itLocs = this->locs[1]->Begin(),
+              itConn = this->conn[1]->Begin();
+              itOutput != this->generatedUSOutputs->End();
+              ++itOutput, ++itPts, ++itTypes, ++itLocs, ++itConn )
+          {
+          (*itOutput)->SetPoints(*itPts);
+          (*itOutput)->SetCells(*itTypes, *itLocs, *itConn);
+          (*itOutput)->Squeeze();
+          }
+        }
+      }
+};
+
+vtkStandardNewMacro(ClipDataSetRange);
+vtkStandardNewMacro(ClipDataSetSplit);
 vtkStandardNewMacro(GenerateClipValueExecutor);
 vtkStandardNewMacro(vtkSMPClipDataSet);
 
@@ -512,14 +631,13 @@ int vtkSMPClipDataSet::RequestData(
 
   //Process all cells and clip each in turn
   //
-  DoClip* functor = DoClip::New();
+  ClipDataSetRange* functor = ClipDataSetRange::New();
   functor->SetData(input, clipScalars, inPD, inCD, estimatedSize,
                    this->UseValueAsOffset || !this->ClipFunction ? this->Value : 0.0,
                    this->InsideOut, numOutputs, newPoints, outPD, this->Locator,
                    conn, outCD, types, locs);
   vtkParallelOperators::ForEach(0,numCells,functor);
 
-  //TODO: Get rid of comments and get correct results (i.e: write a Merge operator for vtkUnstructuredGrid)
   vtkSMPMergePoints* parallelLocator = vtkSMPMergePoints::SafeDownCast(this->Locator);
   vtkMergeDataSets* mergeOp = vtkMergeDataSets::New();
   mergeOp->MasterThreadPopulatedOutputOn();
@@ -591,5 +709,139 @@ int vtkSMPClipDataSet::SplitData(vtkInformation* request,
     vtkInformationVector* outVector,
     vtkThreadLocal<vtkDataObject>** outputs)
   {
-  return 0;
+  // get the info objects
+  vtkInformation *inInfo = inVector[0]->GetInformationObject(0);
+
+  // get the input and output
+  vtkDataSet *realInput = vtkDataSet::SafeDownCast(
+    inInfo->Get(vtkDataObject::DATA_OBJECT()));
+  // We have to create a copy of the input because clip requires being
+  // able to InterpolateAllocate point data from the input that is
+  // exactly the same as output. If the input arrays and output arrays
+  // are different vtkCell3D's Clip will fail. By calling InterpolateAllocate
+  // here, we make sure that the output will look exactly like the output
+  // (unwanted arrays will be eliminated in InterpolateAllocate). The
+  // last argument of InterpolateAllocate makes sure that arrays are shallow
+  // copied from realInput to input.
+  vtkSmartPointer<vtkDataSet> input;
+  input.TakeReference(realInput->NewInstance());
+  input->CopyStructure(realInput);
+  input->GetCellData()->PassData(realInput->GetCellData());
+  input->GetPointData()->InterpolateAllocate(realInput->GetPointData(), 0, 0, 1);
+
+  vtkIdType numPts = input->GetNumberOfPoints();
+  vtkIdType numCells = input->GetNumberOfCells();
+  vtkPointData *inPD=input->GetPointData();
+  vtkCellData *inCD=input->GetCellData();
+  vtkDataArray *clipScalars;
+  vtkPoints *cellPts;
+  vtkIdList *cellIds;
+  double s;
+  vtkIdType npts;
+  vtkIdType *pts;
+  int cellType = 0;
+  vtkIdType i;
+  int j;
+  vtkIdType estimatedSize;
+  int numOutputs = 1;
+  vtkThreadLocal<vtkDataObject>* gOutputs = NULL;
+
+  vtkDebugMacro(<< "Clipping dataset");
+
+  int inputObjectType = input->GetDataObjectType();
+
+  // if we have volumes
+  if (inputObjectType == VTK_STRUCTURED_POINTS)
+    {
+    vtkErrorMacro(<< "vtkStructuredPoints not supported");
+    return 1;
+    }
+  if (inputObjectType == VTK_IMAGE_DATA)
+    {
+    vtkErrorMacro(<< "vtkImageData not supported");
+    return 1;
+    }
+
+  // Initialize self; create output objects
+  //
+  if ( numPts < 1 )
+    {
+    vtkDebugMacro(<<"No data to clip");
+    return 1;
+    }
+
+  if ( !this->ClipFunction && this->GenerateClipScalars )
+    {
+    vtkErrorMacro(<<"Cannot generate clip scalars if no clip function defined");
+    return 1;
+    }
+
+  if ( numCells < 1 )
+    {
+    vtkErrorMacro(<< "Points without cells are not supported");
+    return 1;
+    }
+
+  // allocate the output and associated helper classes
+  estimatedSize = numCells;
+  estimatedSize = estimatedSize / 1024 * 1024; //multiple of 1024
+  if (estimatedSize < 1024)
+    {
+    estimatedSize = 1024;
+    }
+  if ( this->GenerateClippedOutput )
+    {
+    numOutputs = 2;
+    gOutputs = outputs[1];
+    }
+
+  // locator used to merge potentially duplicate points
+  if ( this->Locator == NULL )
+    {
+    this->CreateDefaultLocator();
+    }
+
+  // Determine whether we're clipping with input scalars or a clip function
+  // and do necessary setup.
+  if ( this->ClipFunction )
+    {
+    vtkFloatArray *tmpScalars = vtkFloatArray::New();
+    tmpScalars->SetNumberOfTuples(numPts);
+    tmpScalars->SetName("ClipDataSetScalars");
+    inPD = vtkPointData::New();
+    inPD->ShallowCopy(input->GetPointData());//copies original
+    if ( this->GenerateClipScalars )
+      {
+      inPD->SetScalars(tmpScalars);
+      }
+    GenerateClipValueExecutor* generateClipScalarFunctor =
+        GenerateClipValueExecutor::New();
+    generateClipScalarFunctor->SetData(tmpScalars,input,this->ClipFunction);
+    vtkParallelOperators::ForEach(0,numPts,generateClipScalarFunctor);
+    generateClipScalarFunctor->Delete();
+    clipScalars = tmpScalars;
+    }
+  else //using input scalars
+    {
+    clipScalars = this->GetInputArrayToProcess(0,inVector);
+    if ( !clipScalars )
+      {
+      // When processing composite datasets with partial arrays, this warning is
+      // not applicable, hence disabling it.
+      // vtkErrorMacro(<<"Cannot clip without clip function or input scalars");
+      return 1;
+      }
+    }
+
+  ClipDataSetSplit* functor = ClipDataSetSplit::New();
+  functor->SetData(input, clipScalars, inPD, inCD, estimatedSize,
+                   this->UseValueAsOffset || !this->ClipFunction ? this->Value : 0.0,
+                   this->InsideOut, numOutputs, this->Locator, outputs[0], gOutputs);
+  vtkParallelOperators::ForEach(0,numCells,functor);
+
+  // No merge but we finalize each output
+  functor->FinalizeOutput();
+
+  functor->Delete();
+  return 1;
   }
