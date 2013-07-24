@@ -299,10 +299,10 @@ void vtkSMPClipDataSet::PrintSelf(ostream& os, vtkIndent indent)
   }
 
 int vtkSMPClipDataSet::RequestData(
-  vtkInformation* request,
-  vtkInformationVector** inputVector,
-  vtkInformationVector* outputVector)
-{
+    vtkInformation* request,
+    vtkInformationVector** inputVector,
+    vtkInformationVector* outputVector)
+  {
   // get the info objects
   vtkInformation *inInfo = inputVector[0]->GetInformationObject(0);
   vtkInformation *outInfo = outputVector->GetInformationObject(0);
@@ -582,4 +582,14 @@ int vtkSMPClipDataSet::RequestData(
   output->Squeeze();
 
   return 1;
-}
+  }
+
+vtkSplittingFilterStandardProcessRequest(vtkSMPClipDataSet);
+
+int vtkSMPClipDataSet::SplitData(vtkInformation* request,
+    vtkInformationVector** inVector,
+    vtkInformationVector* outVector,
+    vtkThreadLocal<vtkDataObject>** outputs)
+  {
+  return 0;
+  }
