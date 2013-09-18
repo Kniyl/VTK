@@ -32,7 +32,7 @@ public:
                              int NumberOfOutputPorts);
 
   vtkBooleanMacro(SplitDataset,int);
-  void SetSplitDataset(int value) { this->SplitDataset; }
+  void SetSplitDataset(int value) { this->SplitDataset = value; }
   int GetSplitDataset() { return this->SplitDataset; }
 
 protected:

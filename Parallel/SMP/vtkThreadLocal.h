@@ -3,7 +3,7 @@
 
 #include "vtkParallelSMPModule.h" // For export macro
 #include "vtkObject.h"
-#include "vtkInstantiator.h"
+#include "vtkDataObjectTypes.h"
 #include <vector>
 #include <typeinfo>
 
@@ -86,7 +86,7 @@ class VTKPARALLELSMP_EXPORT vtkThreadLocal : public vtkObject
 
   T* NewLocal ( const char* name, int tid )
     {
-    vtkObject* obj = vtkInstantiator::CreateInstance(name);
+    vtkObject* obj = vtkDataObjectTypes::NewDataObject(name);
     T* item = T::SafeDownCast(obj);
 
     if (item)
