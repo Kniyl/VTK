@@ -1,0 +1,19 @@
+vtk_module(vtkWebCore
+  GROUPS
+    Web
+  DEPENDS
+    vtkCommonCore
+  PRIVATE_DEPENDS
+    vtksys
+    vtkFiltersGeneral
+    vtkPython
+    vtkIOCore
+    vtkIOImage
+    vtkRenderingCore
+    vtkParallelCore
+    vtkWebGLExporter
+  TEST_DEPENDS
+    vtkImagingSources
+  TEST_LABELS
+    VTKWEB
+)

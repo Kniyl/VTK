@@ -1,6 +1,11 @@
 # This project builds the test directories from all VTK modules as a separate
 # project outside the main VTK build tree as if they were an application.
 cmake_minimum_required(VERSION 2.8.5 FATAL_ERROR)
+
+if(POLICY CMP0022)
+  cmake_policy(SET CMP0022 NEW)
+endif()
+
 project(VTKTestExternal)
 if(VTK_SOURCE_DIR OR VTK_BINARY_DIR)
   message(FATAL_ERROR "This directory may build only outside VTK!")
@@ -45,9 +50,12 @@ endif()
 vtk_module_glob("${VTK_TOP_DIR}" "${VTKTestExternal_BINARY_DIR}" Cxx)
 
 # Input information for test build files.
-find_path(VTK_DATA_ROOT VTKData.readme ${VTK_TOP_DIR}/../VTKData)
-find_path(VTK_LARGE_DATA_ROOT VTKLargeData.readme ${VTK_TOP_DIR}/../VTKLargeData)
+option(VTK_USE_LARGE_DATA "Enable tests requiring \"large\" data" OFF)
+set(VTK_TEST_DATA_DIR "${ExternalData_BINARY_ROOT}/Testing")
+set(VTK_TEST_INPUT_DIR "${VTK_TOP_DIR}/Testing/Data")
 set(VTK_TEST_OUTPUT_DIR "${VTKTestExternal_BINARY_DIR}/Testing/Temporary")
+
+include(vtkLegacyData)
 
 # If vtkParallelMPI is found then look for MPI and bring in
 # vtkTestingMPISupport.

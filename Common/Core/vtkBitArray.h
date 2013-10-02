@@ -64,6 +64,13 @@ public:
   virtual void InsertTuple(vtkIdType i, vtkIdType j, vtkAbstractArray* source);
 
   // Description:
+  // Copy the tuples indexed in srcIds from the source array to the tuple
+  // locations indexed by dstIds in this array.
+  // Note that memory allocation is performed as necessary to hold the data.
+  virtual void InsertTuples(vtkIdList *dstIds, vtkIdList *srcIds,
+                            vtkAbstractArray *source);
+
+  // Description:
   // Insert the jth tuple in the source array, at the end in this array.
   // Note that memory allocation is performed as necessary to hold the data.
   // Returns the location at which the data was inserted.
@@ -177,7 +184,7 @@ public:
   // the array supplied by the user.  Set save to 1 to keep the class
   // from deleting the array when it cleans up or reallocates memory.
   // The class uses the actual array provided; it does not copy the data
-  // from the suppled array. If save 0, the array must have been allocated
+  // from the supplied array. If save 0, the array must have been allocated
   // with new[] not malloc.
   void SetArray(unsigned char* array, vtkIdType size, int save);
   void SetVoidArray(void *array, vtkIdType size, int save)
@@ -212,7 +219,7 @@ public:
   virtual void ClearLookup();
 
 protected:
-  vtkBitArray(vtkIdType numComp=1);
+  vtkBitArray();
   ~vtkBitArray();
 
   unsigned char *Array;   // pointer to data

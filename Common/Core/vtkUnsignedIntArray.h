@@ -31,9 +31,13 @@
 #include "vtkDataArrayTemplate.h" // Real Superclass
 
 // Fake the superclass for the wrappers.
+#ifndef __WRAP__
 #define vtkDataArray vtkDataArrayTemplate<unsigned int>
+#endif
 class VTKCOMMONCORE_EXPORT vtkUnsignedIntArray : public vtkDataArray
+#ifndef __WRAP__
 #undef vtkDataArray
+#endif
 {
 public:
   static vtkUnsignedIntArray* New();
@@ -141,14 +145,14 @@ public:
   // the array supplied by the user.  Set save to 1 to keep the class
   // from deleting the array when it cleans up or reallocates memory.
   // The class uses the actual array provided; it does not copy the data
-  // from the suppled array.
+  // from the supplied array.
   void SetArray(unsigned int* array, vtkIdType size, int save)
     { this->RealSuperclass::SetArray(array, size, save); }
   void SetArray(unsigned int* array, vtkIdType size, int save, int deleteMethod)
     { this->RealSuperclass::SetArray(array, size, save, deleteMethod); }
 
 protected:
-  vtkUnsignedIntArray(vtkIdType numComp=1);
+  vtkUnsignedIntArray();
   ~vtkUnsignedIntArray();
 
 private:
