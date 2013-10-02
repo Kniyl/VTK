@@ -88,17 +88,15 @@ class ParallelFilterExecutor : public vtkRangeFunctorInitializable
         inLocalInfo[i] = this->inLocalInfo[i]->GetLocal(tid);
         }
       vtkInformationVector* outLocalInfo = this->outLocalInfo->GetLocal(tid);
-      vtkInformation* requests = this->requests->GetLocal(tid);
+      vtkInformation* request = this->requests->GetLocal(tid);
+      vtkInformation* inInfo = inLocalInfo[this->compositePort]->GetInformationObject(0);
+      vtkInformation* outInfo = outLocalInfo->GetInformationObject(0);
       
       for (vtkIdType id = range->Begin(); id < range->End(); ++id)
         {
         vtkDataObject* dobj = this->inObjs[id];
         if (dobj)
           {
-          vtkInformation* r = requests;
-          vtkInformation* inInfo = inLocalInfo[this->compositePort]->GetInformationObject(0);
-          vtkInformation* outInfo = outLocalInfo->GetInformationObject(0);
-
           // Note that since VisitOnlyLeaves is ON on the iterator,
           // this method is called only for leaves, hence, we are assured that
           // neither dobj nor outObj are vtkCompositeDataSet subclasses.
@@ -108,7 +106,7 @@ class ParallelFilterExecutor : public vtkRangeFunctorInitializable
                                                    outLocalInfo,
                                                    inInfo,
                                                    outInfo,
-                                                   r,
+                                                   request,
                                                    dobj);
           }
         else
