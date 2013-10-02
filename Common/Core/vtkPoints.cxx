@@ -77,14 +77,10 @@ vtkPoints::~vtkPoints()
 }
 
 // Given a list of pt ids, return an array of points.
-void vtkPoints::GetPoints(vtkIdList *ptIds, vtkPoints *fp)
+void vtkPoints::GetPoints(vtkIdList *ptIds, vtkPoints *outPoints)
 {
-  vtkIdType num = ptIds->GetNumberOfIds();
-
-  for (vtkIdType i=0; i < num; i++)
-    {
-    fp->InsertPoint(i, this->GetPoint(ptIds->GetId(i)));
-    }
+  outPoints->Data->SetNumberOfTuples(ptIds->GetNumberOfIds());
+  this->Data->GetTuples(ptIds, outPoints->Data);
 }
 
 // Determine (xmin,xmax, ymin,ymax, zmin,zmax) bounds of points.
@@ -219,23 +215,18 @@ void vtkPoints::PrintSelf(ostream& os, vtkIndent indent)
 {
   this->Superclass::PrintSelf(os,indent);
 
-  double *bounds;
-
   os << indent << "Data: " << this->Data << "\n";
-  if ( this->Data )
+  if ( this->Data->GetName() )
     {
-    if ( this->Data->GetName() )
-      {
-      os << indent << "Data Array Name: " << this->Data->GetName() << "\n";
-      }
-    else
-      {
-      os << indent << "Data Array Name: (none)\n";
-      }
+    os << indent << "Data Array Name: " << this->Data->GetName() << "\n";
+    }
+  else
+    {
+    os << indent << "Data Array Name: (none)\n";
     }
 
   os << indent << "Number Of Points: " << this->GetNumberOfPoints() << "\n";
-  bounds = this->GetBounds();
+  double *bounds = this->GetBounds();
   os << indent << "Bounds: \n";
   os << indent << "  Xmin,Xmax: (" << bounds[0] << ", " << bounds[1] << ")\n";
   os << indent << "  Ymin,Ymax: (" << bounds[2] << ", " << bounds[3] << ")\n";

@@ -115,8 +115,6 @@ public:
     this->IntersectWith(&otherIds); };
   //ETX
 
-  vtkIdType *Resize(const vtkIdType sz);
-
 protected:
   vtkIdList();
   ~vtkIdList();
@@ -125,10 +123,25 @@ protected:
   vtkIdType Size;
   vtkIdType *Ids;
 
+  vtkIdType *Resize(const vtkIdType sz);
 private:
   vtkIdList(const vtkIdList&);  // Not implemented.
   void operator=(const vtkIdList&);  // Not implemented.
 };
+
+// In-lined for performance
+inline void vtkIdList::InsertId(const vtkIdType i, const vtkIdType vtkid)
+{
+  if (i >= this->Size)
+    {
+    this->Resize(i + 1);
+    }
+  this->Ids[i] = vtkid;
+  if (i >= this->NumberOfIds)
+    {
+    this->NumberOfIds = i + 1;
+    }
+}
 
 // In-lined for performance
 inline vtkIdType vtkIdList::InsertNextId(const vtkIdType vtkid)

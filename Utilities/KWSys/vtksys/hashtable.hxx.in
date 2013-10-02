@@ -62,6 +62,20 @@
 # pragma set woff 3970 /* pointer to int conversion */ 3321 3968
 #endif
 
+<<<<<<< HEAD
+=======
+// In C++11, clang will warn about using dynamic exception specifications
+// as they are deprecated.  But as this class is trying to faithfully
+// mimic unordered_set and unordered_map, we want to keep the 'throw()'
+// decorations below.  So we suppress the warning.
+#if defined(__clang__) && defined(__has_warning)
+# if __has_warning("-Wdeprecated")
+#  pragma clang diagnostic push
+#  pragma clang diagnostic ignored "-Wdeprecated"
+# endif
+#endif
+
+>>>>>>> kitware/master
 #if @KWSYS_NAMESPACE@_STL_HAS_ALLOCATOR_TEMPLATE
 # define @KWSYS_NAMESPACE@_HASH_DEFAULT_ALLOCATOR(T) @KWSYS_NAMESPACE@_stl::allocator< T >
 #elif @KWSYS_NAMESPACE@_STL_HAS_ALLOCATOR_NONTEMPLATE
@@ -1268,6 +1282,16 @@ using @KWSYS_NAMESPACE@::operator==;
 using @KWSYS_NAMESPACE@::operator!=;
 #endif
 
+<<<<<<< HEAD
+=======
+// Undo warning suppression.
+#if defined(__clang__) && defined(__has_warning)
+# if __has_warning("-Wdeprecated")
+#  pragma clang diagnostic pop
+# endif
+#endif
+
+>>>>>>> kitware/master
 #if defined(_MSC_VER)
 # pragma warning (pop)
 #endif

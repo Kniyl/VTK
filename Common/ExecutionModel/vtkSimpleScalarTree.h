@@ -103,10 +103,9 @@ protected:
   vtkScalarNode *Tree; //pointerless scalar range tree
   int TreeSize; //allocated size of tree
 
-  vtkIdType LeafOffset; //offset to leaf nodes of tree
-  vtkIdType TreeIndex; //traversal location within tree
-
 private:
+  vtkIdType TreeIndex; //traversal location within tree
+  vtkIdType LeafOffset; //offset to leaf nodes of tree
   int       ChildNumber; //current child in traversal
   vtkIdType CellId; //current cell id being examined
   int       FindStartLeaf(vtkIdType index, int level);

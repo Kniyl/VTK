@@ -87,7 +87,6 @@ int vtkTransformFilter::RequestData(
 {
   vtkSmartPointer<vtkPointSet> input = vtkPointSet::GetData(inputVector[0]);
   vtkPointSet *output = vtkPointSet::GetData(outputVector);
-  bool isSmp = this->Transform->IsA("vtkSMPTransform");
 
   if (!input)
     {
@@ -160,22 +159,19 @@ int vtkTransformFilter::RequestData(
   numCells = input->GetNumberOfCells();
 
   newPts = vtkPoints::New();
-  if (isSmp) newPts->SetNumberOfPoints(numPts);
-  else newPts->Allocate(numPts);
+  newPts->Allocate(numPts);
   if ( inVectors )
     {
     newVectors = vtkFloatArray::New();
     newVectors->SetNumberOfComponents(3);
-    if (isSmp) newVectors->SetNumberOfTuples(numPts);
-    else newVectors->Allocate(3*numPts);
+    newVectors->Allocate(3*numPts);
     newVectors->SetName(inVectors->GetName());
     }
   if ( inNormals )
     {
     newNormals = vtkFloatArray::New();
     newNormals->SetNumberOfComponents(3);
-    if (isSmp) newNormals->SetNumberOfTuples(numPts);
-    else newNormals->Allocate(3*numPts);
+    newNormals->Allocate(3*numPts);
     newNormals->SetName(inNormals->GetName());
     }
 
@@ -205,8 +201,7 @@ int vtkTransformFilter::RequestData(
       {
       newCellVectors = vtkFloatArray::New();
       newCellVectors->SetNumberOfComponents(3);
-      if (isSmp) newCellVectors->SetNumberOfTuples(numCells);
-      else newCellVectors->Allocate(3*numCells);
+      newCellVectors->Allocate(3*numCells);
       newCellVectors->SetName( inCellVectors->GetName() );
       lt->TransformVectors(inCellVectors,newCellVectors);
       }
@@ -214,8 +209,7 @@ int vtkTransformFilter::RequestData(
       {
       newCellNormals = vtkFloatArray::New();
       newCellNormals->SetNumberOfComponents(3);
-      if (isSmp) newCellNormals->SetNumberOfTuples(numCells);
-      else newCellNormals->Allocate(3*numCells);
+      newCellNormals->Allocate(3*numCells);
       newCellNormals->SetName( inCellNormals->GetName() );
       lt->TransformNormals(inCellNormals,newCellNormals);
       }

@@ -1,7 +1,7 @@
 include(vtkGhostscript)
 
-# Only run GL2PS tests if GhostScript is available if VTK_DATA_ROOT is set
-if(VTK_GHOSTSCRIPT_EXECUTABLE AND VTK_DATA_ROOT)
+# Only run GL2PS tests if GhostScript is available
+if(VTK_GHOSTSCRIPT_EXECUTABLE)
   set(GL2PSTests
     TestContextGL2PS.cxx,NO_VALID
     TestGL2PSExporterMultipleRenderers.cxx
@@ -10,6 +10,7 @@ if(VTK_GHOSTSCRIPT_EXECUTABLE AND VTK_DATA_ROOT)
     TestGL2PSExporterVector.cxx,NO_VALID
     TestGL2PSExporterVolumeRaster.cxx,NO_VALID
     TestGL2PSTextActor3D.cxx
+    TestGL2PSLabeledDataMapper.cxx
     TestStackedPlotGL2PS.cxx
   )
 endif()
@@ -54,7 +55,7 @@ if(GL2PSTests)
     ExternalData_add_test(VTKData
       NAME ${vtk-module}Cxx-${TName}-VerifyRasterizedPNG
       COMMAND vtkRenderingGL2PSCxxTests PNGCompare
-        -D ${VTK_DATA_ROOT}
+        -D ${VTK_TEST_DATA_DIR}
         -T ${VTK_TEST_OUTPUT_DIR}
         -E ${_error_threshold}
         -V DATA{../Data/Baseline/${TName}-rasterRef.png,:}
