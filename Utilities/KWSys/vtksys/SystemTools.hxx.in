@@ -766,11 +766,7 @@ public:
   static kwsys_stl::string GetCurrentWorkingDirectory(bool collapse =true);
 
   /**
-<<<<<<< HEAD
-   * Change directory the the directory specified
-=======
    * Change directory to the directory specified
->>>>>>> kitware/master
    */
   static int ChangeDirectory(const char* dir);
 

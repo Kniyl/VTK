@@ -312,13 +312,8 @@ static       char* regbranch (int*);
 static       char* regpiece (int*);
 static       char* regatom (int*);
 static       char* regnode (char);
-<<<<<<< HEAD
-static const char* regnext (register const char*);
-static       char* regnext (register char*);
-=======
 static const char* regnext (const char*);
 static       char* regnext (char*);
->>>>>>> kitware/master
 static void        regc (char);
 static void        reginsert (char, char*);
 static void        regtail (char*, const char*);
@@ -349,17 +344,10 @@ static int strcspn ();
 // for later pattern matching.
 
 bool RegularExpression::compile (const char* exp) {
-<<<<<<< HEAD
-    register const char* scan;
-    register const char* longest;
-    register size_t len;
-             int         flags;
-=======
     const char* scan;
     const char* longest;
     size_t      len;
     int         flags;
->>>>>>> kitware/master
 
     if (exp == 0) {
       //RAISE Error, SYM(RegularExpression), SYM(No_Expr),
@@ -456,19 +444,11 @@ bool RegularExpression::compile (const char* exp) {
  * follows makes it hard to avoid.
  */
 static char* reg (int paren, int *flagp) {
-<<<<<<< HEAD
-    register char* ret;
-    register char* br;
-    register char* ender;
-    register int   parno =0;
-             int   flags;
-=======
     char* ret;
     char* br;
     char* ender;
     int   parno =0;
     int   flags;
->>>>>>> kitware/master
 
     *flagp = HASWIDTH;          // Tentatively.
 
@@ -545,17 +525,10 @@ static char* reg (int paren, int *flagp) {
  * Implements the concatenation operator.
  */
 static char* regbranch (int *flagp) {
-<<<<<<< HEAD
-    register char* ret;
-    register char* chain;
-    register char* latest;
-    int                  flags;
-=======
     char* ret;
     char* chain;
     char* latest;
     int   flags;
->>>>>>> kitware/master
 
     *flagp = WORST;             // Tentatively.
 
@@ -589,17 +562,10 @@ static char* regbranch (int *flagp) {
  * endmarker role is not redundant.
  */
 static char* regpiece (int *flagp) {
-<<<<<<< HEAD
-    register char* ret;
-    register char  op;
-    register char* next;
-    int            flags;
-=======
     char* ret;
     char  op;
     char* next;
     int   flags;
->>>>>>> kitware/master
 
     ret = regatom(&flags);
     if (ret == 0)
@@ -665,13 +631,8 @@ static char* regpiece (int *flagp) {
  * separate node; the code is simpler that way and it's not worth fixing.
  */
 static char* regatom (int *flagp) {
-<<<<<<< HEAD
-    register char* ret;
-             int   flags;
-=======
     char* ret;
     int   flags;
->>>>>>> kitware/master
 
     *flagp = WORST;             // Tentatively.
 
@@ -687,13 +648,8 @@ static char* regatom (int *flagp) {
             *flagp |= HASWIDTH | SIMPLE;
             break;
         case '[':{
-<<<<<<< HEAD
-                register int    rxpclass;
-                register int    rxpclassend;
-=======
                 int    rxpclass;
                 int    rxpclassend;
->>>>>>> kitware/master
 
                 if (*regparse == '^') { // Complement of range.
                     ret = regnode(ANYBUT);
@@ -764,13 +720,8 @@ static char* regatom (int *flagp) {
             *flagp |= HASWIDTH | SIMPLE;
             break;
         default:{
-<<<<<<< HEAD
-                register int    len;
-                register char   ender;
-=======
                 int    len;
                 char   ender;
->>>>>>> kitware/master
 
                 regparse--;
                 len = int(strcspn(regparse, META));
@@ -803,13 +754,8 @@ static char* regatom (int *flagp) {
    Location.
  */
 static char* regnode (char op) {
-<<<<<<< HEAD
-    register char* ret;
-    register char* ptr;
-=======
     char* ret;
     char* ptr;
->>>>>>> kitware/master
 
     ret = regcode;
     if (ret == &regdummy) {
@@ -844,15 +790,9 @@ static void regc (char b) {
  * Means relocating the operand.
  */
 static void reginsert (char op, char* opnd) {
-<<<<<<< HEAD
-    register char* src;
-    register char* dst;
-    register char* place;
-=======
     char* src;
     char* dst;
     char* place;
->>>>>>> kitware/master
 
     if (regcode == &regdummy) {
         regsize += 3;
@@ -876,15 +816,9 @@ static void reginsert (char op, char* opnd) {
  - regtail - set the next-pointer at the end of a node chain
  */
 static void regtail (char* p, const char* val) {
-<<<<<<< HEAD
-    register char* scan;
-    register char* temp;
-    register int   offset;
-=======
     char* scan;
     char* temp;
     int   offset;
->>>>>>> kitware/master
 
     if (p == &regdummy)
         return;
@@ -959,11 +893,7 @@ bool RegularExpression::find (kwsys_stl::string const& s)
 // Returns true if found, and sets start and end indexes accordingly.
 
 bool RegularExpression::find (const char* string) {
-<<<<<<< HEAD
-    register const char* s;
-=======
     const char* s;
->>>>>>> kitware/master
 
     this->searchstring = string;
 
@@ -1026,15 +956,9 @@ bool RegularExpression::find (const char* string) {
  */
 static int regtry (const char* string, const char* *start,
                    const char* *end, const char* prog) {
-<<<<<<< HEAD
-    register       int    i;
-    register const char* *sp1;
-    register const char* *ep;
-=======
                    int    i;
                    const char* *sp1;
                    const char* *ep;
->>>>>>> kitware/master
 
     reginput = string;
     regstartp = start;
@@ -1068,13 +992,8 @@ static int regtry (const char* string, const char* *start,
  * 0 failure, 1 success
  */
 static int regmatch (const char* prog) {
-<<<<<<< HEAD
-    register const char* scan;  // Current node.
-             const char* next;  // Next node.
-=======
     const char* scan;  // Current node.
     const char* next;  // Next node.
->>>>>>> kitware/master
 
     scan = prog;
 
@@ -1097,13 +1016,8 @@ static int regmatch (const char* prog) {
                 reginput++;
                 break;
             case EXACTLY:{
-<<<<<<< HEAD
-                    register size_t len;
-                    register const char* opnd;
-=======
                     size_t len;
                     const char* opnd;
->>>>>>> kitware/master
 
                     opnd = OPERAND(scan);
                     // Inline the first character, for speed.
@@ -1138,13 +1052,8 @@ static int regmatch (const char* prog) {
             case OPEN + 7:
             case OPEN + 8:
             case OPEN + 9:{
-<<<<<<< HEAD
-                    register       int    no;
-                    register const char* save;
-=======
                     int    no;
                     const char* save;
->>>>>>> kitware/master
 
                     no = OP(scan) - OPEN;
                     save = reginput;
@@ -1172,13 +1081,8 @@ static int regmatch (const char* prog) {
             case CLOSE + 7:
             case CLOSE + 8:
             case CLOSE + 9:{
-<<<<<<< HEAD
-                    register       int    no;
-                    register const char* save;
-=======
                     int    no;
                     const char* save;
->>>>>>> kitware/master
 
                     no = OP(scan) - CLOSE;
                     save = reginput;
@@ -1199,11 +1103,7 @@ static int regmatch (const char* prog) {
 //              break;
             case BRANCH:{
 
-<<<<<<< HEAD
-              register const char* save;
-=======
               const char* save;
->>>>>>> kitware/master
 
                     if (OP(next) != BRANCH)     // No choice.
                         next = OPERAND(scan);   // Avoid recursion.
@@ -1222,17 +1122,10 @@ static int regmatch (const char* prog) {
                 break;
             case STAR:
             case PLUS:{
-<<<<<<< HEAD
-              register char   nextch;
-                    register int        no;
-                    register const char* save;
-                    register int        min_no;
-=======
                     char   nextch;
                     int        no;
                     const char* save;
                     int        min_no;
->>>>>>> kitware/master
 
                     //
                     // Lookahead to avoid useless match attempts when we know
@@ -1281,15 +1174,9 @@ static int regmatch (const char* prog) {
  - regrepeat - repeatedly match something simple, report how many
  */
 static int regrepeat (const char* p) {
-<<<<<<< HEAD
-    register       int   count = 0;
-    register const char* scan;
-    register const char* opnd;
-=======
     int         count = 0;
     const char* scan;
     const char* opnd;
->>>>>>> kitware/master
 
     scan = reginput;
     opnd = OPERAND(p);
@@ -1329,13 +1216,8 @@ static int regrepeat (const char* p) {
 /*
  - regnext - dig the "next" pointer out of a node
  */
-<<<<<<< HEAD
-static const char* regnext (register const char* p) {
-    register int offset;
-=======
 static const char* regnext (const char* p) {
     int offset;
->>>>>>> kitware/master
 
     if (p == &regdummy)
         return (0);
@@ -1350,13 +1232,8 @@ static const char* regnext (const char* p) {
         return (p + offset);
 }
 
-<<<<<<< HEAD
-static char* regnext (register char* p) {
-    register int offset;
-=======
 static char* regnext (char* p) {
     int offset;
->>>>>>> kitware/master
 
     if (p == &regdummy)
         return (0);
