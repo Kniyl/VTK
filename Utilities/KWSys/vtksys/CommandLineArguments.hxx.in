@@ -44,11 +44,7 @@ struct CommandLineArgumentsCallbackStructure;
  *
  * For the variable interface you associate variable with each argument. When
  * the argument is specified, the variable is set to the specified value casted
-<<<<<<< HEAD
- * to the apropriate type. For boolean (NO_ARGUMENT), the value is "1".
-=======
  * to the appropriate type. For boolean (NO_ARGUMENT), the value is "1".
->>>>>>> kitware/master
  *
  * Both interfaces can be used at the same time. 
  *
@@ -103,11 +99,7 @@ public:
     STRING_TYPE,          // The variable is string (char*)
     STL_STRING_TYPE,      // The variable is string (char*)
     VECTOR_INT_TYPE,             // The variable is integer (int)
-<<<<<<< HEAD
-    VECTOR_BOOL_TYPE,            // The vairable is boolean (bool)
-=======
     VECTOR_BOOL_TYPE,            // The variable is boolean (bool)
->>>>>>> kitware/master
     VECTOR_DOUBLE_TYPE,          // The variable is float (double)
     VECTOR_STRING_TYPE,          // The variable is string (char*)
     VECTOR_STL_STRING_TYPE,      // The variable is string (char*)
@@ -136,11 +128,7 @@ public:
   void ProcessArgument(const char* arg);
 
   /**
-<<<<<<< HEAD
-   * This method will parse arguments and call apropriate methods. 
-=======
    * This method will parse arguments and call appropriate methods.
->>>>>>> kitware/master
    */
   int Parse();
 
@@ -156,11 +144,7 @@ public:
   /**
    * Add handler for argument which is going to set the variable to the
    * specified value. If the argument is specified, the option is casted to the
-<<<<<<< HEAD
-   * apropriate type.
-=======
    * appropriate type.
->>>>>>> kitware/master
    */
   void AddArgument(const char* argument, ArgumentTypeEnum type,
     bool* variable, const char* help);
@@ -176,11 +160,7 @@ public:
   /**
    * Add handler for argument which is going to set the variable to the
    * specified value. If the argument is specified, the option is casted to the
-<<<<<<< HEAD
-   * apropriate type. This will handle the multi argument values.
-=======
    * appropriate type. This will handle the multi argument values.
->>>>>>> kitware/master
    */
   void AddArgument(const char* argument, ArgumentTypeEnum type,
     kwsys_stl::vector<bool>* variable, const char* help);
